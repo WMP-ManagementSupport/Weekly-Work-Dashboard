@@ -91,8 +91,10 @@
   .flow .next{background:#e3ebf7;border:1px solid #cbdaef;}
   .flow .arrow{display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:14px;}
   .empty{color:var(--faint);font-style:italic;}
-  .remark{margin-top:8px;border-radius:10px;padding:10px 13px;font-size:12px;line-height:1.6;color:#5b5240;background:#fbf7ee;border:1px solid #ecdfc0;white-space:pre-line;}
+  .remark{border-radius:10px;padding:10px 13px;font-size:12px;line-height:1.6;color:#5b5240;background:#fbf7ee;border:1px solid #ecdfc0;white-space:pre-line;}
   .remark .lbl{display:block;font-size:10px;font-weight:800;color:var(--wait);letter-spacing:.03em;margin-bottom:4px;text-transform:uppercase;}
+  .flow .box.remark{background:#fbf7ee;border:1px solid #ecdfc0;color:#5b5240;white-space:pre-line;margin-top:0;}
+  .flow .box.remark .lbl{color:var(--wait);}
   mark{background:#fde9a8;color:inherit;border-radius:3px;padding:0 1px;}
 
   .dept-section{margin-bottom:32px;}
@@ -188,7 +190,7 @@
     <div class="kpi prog"><div class="num" id="k-prog">-</div><div class="lbl">진행중</div></div>
     <div class="kpi wait"><div class="num" id="k-wait">-</div><div class="lbl">예정·확인중</div></div>
     <div class="kpi overdue"><div class="num" id="k-overdue">-</div><div class="lbl">마감 지남</div></div>
-    <div class="kpi"><div class="num" id="k-empty">-</div><div class="lbl">금주계획 미입력</div></div>
+    <div class="kpi"><div class="num" id="k-empty">-</div><div class="lbl">이번주 업무 미입력</div></div>
   </div>
 
   <div class="search-row">
@@ -332,7 +334,7 @@ async function fetchTasksFromSheet(gid){
       const cell = c[i];
       return (cell.f !== undefined && cell.f !== null && cell.f !== '') ? cell.f : (cell.v ?? '');
     };
-    // 열 순서: 부서, 업무구분, 담당자, 업무명, 업무 설명, 세부내용, 지난주 진행내용, 금주 계획, 상태, 마감일, 비고
+    // 열 순서: 부서, 업무구분, 담당자, 업무명, 업무 설명, 세부내용, 지난주 업무, 이번주 업무, 상태, 마감일, 다음주 업무
     const dept   = String(get(0)).trim();
     const cat    = String(get(1)).trim();
     const owner  = String(get(2)).trim();
@@ -576,11 +578,12 @@ function renderList(){
           <div class="task-body">
             ${t.desc ? `<div class="desc">${t.desc}</div>` : ""}
             <div class="flow">
-              <div class="box last"><span class="lbl">지난주 진행</span>${t.last ? t.last : '<span class="empty">지난주 진행 내용 없음</span>'}</div>
+              <div class="box last"><span class="lbl">지난주 업무</span>${t.last ? t.last : '<span class="empty">지난주 업무 내용 없음</span>'}</div>
               <div class="arrow">→</div>
-              <div class="box next"><span class="lbl">금주 계획</span>${t.next ? t.next : '<span class="empty">금주 계획 미입력</span>'}</div>
+              <div class="box next"><span class="lbl">이번주 업무</span>${t.next ? t.next : '<span class="empty">이번주 업무 미입력</span>'}</div>
+              <div class="arrow">→</div>
+              <div class="box remark"><span class="lbl">다음주 업무</span>${t.remark ? t.remark : '<span class="empty">다음주 업무 내용 없음</span>'}</div>
             </div>
-            ${t.remark ? `<div class="remark"><span class="lbl">비고</span>${t.remark}</div>` : ""}
           </div>`;
         ownerBlock.appendChild(el);
       });
