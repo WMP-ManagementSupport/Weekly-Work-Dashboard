@@ -115,12 +115,12 @@
   .task[open]{padding-bottom:4px;}
   .task summary{list-style:none;cursor:pointer;padding:13px 16px;}
   .task summary::-webkit-details-marker{display:none;}
-  .task-top{display:grid;grid-template-columns:96px minmax(0,1fr) 90px auto 14px;align-items:center;column-gap:10px;}
+  .task-top{display:grid;grid-template-columns:96px minmax(0,1fr) 90px 118px 14px;align-items:center;column-gap:10px;}
   .task-top .chevron{font-size:11px;color:var(--faint);transition:transform .15s;justify-self:end;}
   .task[open] .chevron{transform:rotate(90deg);}
   .tag{font-size:11px;font-weight:700;color:var(--sub);background:#f0f1f3;padding:3px 9px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;justify-self:center;max-width:100%;}
   .title{font-size:15.5px;font-weight:800;color:var(--ink);letter-spacing:-0.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .due{font-size:11.5px;color:var(--faint);white-space:nowrap;text-align:left;justify-self:start;}
+  .due{font-size:11.5px;color:var(--faint);white-space:nowrap;text-align:left;justify-self:start;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
   .due.soon{color:var(--wait);font-weight:700;}
   .due.overdue{color:var(--hold);font-weight:700;}
   .status{font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:20px;text-align:center;justify-self:center;white-space:nowrap;}
