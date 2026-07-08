@@ -95,9 +95,14 @@
 
   .dept-section{margin-bottom:32px;}
   .dept-section:last-child{margin-bottom:0;}
-  .dept-header{display:flex;align-items:baseline;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--ink);}
+  .dept-header{display:flex;align-items:baseline;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--ink);cursor:pointer;list-style:none;user-select:none;}
+  .dept-header::-webkit-details-marker{display:none;}
+  .dept-header .dept-chevron{font-size:11px;color:var(--faint);transition:transform .15s;}
+  .dept-section[open] .dept-header .dept-chevron{transform:rotate(90deg);}
+  .dept-section:not([open]) .dept-header{margin-bottom:0;}
   .dept-header .dept-name{font-size:17px;font-weight:800;color:var(--ink);letter-spacing:-0.01em;}
   .dept-header .dept-count{font-size:12px;color:var(--sub);font-weight:600;background:#f0f1f3;padding:2px 10px;border-radius:12px;}
+  .dept-header:hover .dept-name{color:var(--accent);}
 
   .owner-group{margin-bottom:14px;}
   .owner-group:last-child{margin-bottom:0;}
@@ -116,6 +121,8 @@
   .tag{font-size:11px;font-weight:700;color:var(--sub);background:#f0f1f3;padding:3px 9px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;justify-self:center;max-width:100%;}
   .title{font-size:15.5px;font-weight:800;color:var(--ink);letter-spacing:-0.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .due{font-size:11.5px;color:var(--faint);white-space:nowrap;text-align:left;justify-self:start;}
+  .due.soon{color:var(--wait);font-weight:700;}
+  .due.overdue{color:var(--hold);font-weight:700;}
   .status{font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:20px;text-align:center;justify-self:center;white-space:nowrap;}
   .status.진행중{color:var(--prog);background:#eaf0f9;}
   .status.완료{color:var(--ok);background:#eef0f2;}
@@ -247,6 +254,7 @@ let activeStatus = "전체";
 let activeOwner = "전체";
 let searchText = "";
 let searchDebounceTimer = null;
+let collapsedDepts = new Set();
 
 function updateNowBar(){
   const now = new Date();
@@ -285,6 +293,7 @@ function onWeekChange(){
   activeStatus = "전체";
   activeOwner = "전체";
   searchText = "";
+  collapsedDepts = new Set();
   const input = document.getElementById('search-input');
   if(input) input.value = "";
   loadAndRender();
@@ -397,6 +406,34 @@ function formatDue(due){
   return isDateLikeDue(due) ? ('마감 ' + due) : due;
 }
 
+function parseDueDate(due){
+  if(!due) return null;
+  let m = due.match(/^(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})$/);
+  if(m){
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  }
+  m = due.match(/^(\d{1,2})[-.\/](\d{1,2})$/);
+  if(m){
+    const now = new Date();
+    return new Date(now.getFullYear(), Number(m[1]) - 1, Number(m[2]));
+  }
+  return null;
+}
+
+// 마감 임박/지연 여부를 계산. 완료 업무는 강조하지 않음.
+function dueUrgency(t){
+  if(t.status === '완료') return { cls:'', suffix:'' };
+  const d = parseDueDate(t.due);
+  if(!d) return { cls:'', suffix:'' };
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const diffDays = Math.round((d - today) / 86400000);
+  if(diffDays < 0) return { cls:'overdue', suffix:` · 지연 ${Math.abs(diffDays)}일` };
+  if(diffDays === 0) return { cls:'soon', suffix:' · D-day' };
+  if(diffDays <= 3) return { cls:'soon', suffix:` · D-${diffDays}` };
+  return { cls:'', suffix:'' };
+}
+
 function escapeRegExp(s){
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -472,13 +509,21 @@ function renderList(){
   deptKeys.forEach(deptKey=>{
     const items = deptGroups.get(deptKey);
 
-    const section = document.createElement('div');
+    const section = document.createElement('details');
     section.className = 'dept-section';
-    section.innerHTML = `
-      <div class="dept-header">
+    const hasMatch = term && items.some(t=> t.title.toLowerCase().includes(term.toLowerCase()) || (t.owner||'').toLowerCase().includes(term.toLowerCase()));
+    section.open = hasMatch ? true : !collapsedDepts.has(deptKey);
+    const summary = document.createElement('summary');
+    summary.className = 'dept-header';
+    summary.innerHTML = `
+        <span class="dept-chevron">▶</span>
         <span class="dept-name">${deptKey}</span>
-        <span class="dept-count">${items.length}건</span>
-      </div>`;
+        <span class="dept-count">${items.length}건</span>`;
+    section.appendChild(summary);
+
+    const deptBody = document.createElement('div');
+    deptBody.className = 'dept-body';
+    section.appendChild(deptBody);
 
     // 담당자별로 그룹화 (등장 순서 유지)
     const ownerGroups = new Map();
@@ -511,7 +556,7 @@ function renderList(){
               <span class="tag">${t.cat}</span>
               <span class="title">${highlight(t.title, term)}</span>
               <span class="status ${statusClass}">${t.status || '-'}</span>
-              <span class="due">${formatDue(t.due)}</span>
+              <span class="due ${dueUrgency(t).cls}">${formatDue(t.due)}${dueUrgency(t).suffix}</span>
               <span class="chevron">▶</span>
             </div>
           </summary>
@@ -527,7 +572,7 @@ function renderList(){
         ownerBlock.appendChild(el);
       });
 
-      section.appendChild(ownerBlock);
+      deptBody.appendChild(ownerBlock);
     });
 
     list.appendChild(section);
@@ -601,6 +646,14 @@ function manualRefresh(){
 document.getElementById('list').addEventListener('toggle', (e)=>{
   if(e.target.classList && e.target.classList.contains('task')){
     updateToggleAllBtn();
+  }
+  if(e.target.classList && e.target.classList.contains('dept-section')){
+    const deptKey = e.target.querySelector('.dept-name')?.textContent || '';
+    if(e.target.open){
+      collapsedDepts.delete(deptKey);
+    }else{
+      collapsedDepts.add(deptKey);
+    }
   }
 }, true);
 
