@@ -18,6 +18,7 @@
     --ok:#7c8591;
     --prog:#3b5580;
     --wait:#a6741f;
+    --plan:#4f7a68;
     --hold:#a83a3a;
   }
   *{box-sizing:border-box;}
@@ -61,13 +62,14 @@
   .search-clear:hover{color:var(--hold);}
 
   /* KPI row */
-  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:28px;}
+  .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:28px;}
   .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 14px;text-align:center;}
   .kpi .num{font-size:26px;font-weight:700;color:var(--ink);line-height:1.1;}
   .kpi .lbl{font-size:11.5px;color:var(--sub);margin-top:6px;font-weight:600;}
   .kpi.total .num{color:var(--accent);}
   .kpi.prog .num{color:var(--prog);}
   .kpi.wait .num{color:var(--wait);}
+  .kpi.overdue .num{color:var(--hold);}
 
   /* filter bar */
   .filters-row{display:flex;flex-direction:column;gap:10px;margin-bottom:18px;}
@@ -126,7 +128,8 @@
   .status{font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:20px;text-align:center;justify-self:center;white-space:nowrap;}
   .status.진행중{color:var(--prog);background:#eaf0f9;}
   .status.완료{color:var(--ok);background:#eef0f2;}
-  .status.확인중,.status.예정{color:var(--wait);background:#faf3e6;}
+  .status.확인중{color:var(--wait);background:#faf3e6;}
+  .status.예정{color:var(--plan);background:#eaf3ef;}
   .status.보류{color:var(--hold);background:#fbecec;}
 
   .task-body{padding:0 16px 16px;}
@@ -137,7 +140,6 @@
 
   @media(max-width:720px){
     .kpis{grid-template-columns:repeat(3,1fr);}
-    .kpis .kpi:nth-child(4),.kpis .kpi:nth-child(5){grid-column:span 1;}
     .flow{grid-template-columns:1fr;}
     .flow .arrow{transform:rotate(90deg);padding:4px 0;}
     .head-row{flex-direction:column;align-items:flex-start;}
@@ -183,6 +185,7 @@
     <div class="kpi"><div class="num" id="k-done">-</div><div class="lbl">완료</div></div>
     <div class="kpi prog"><div class="num" id="k-prog">-</div><div class="lbl">진행중</div></div>
     <div class="kpi wait"><div class="num" id="k-wait">-</div><div class="lbl">예정·확인중</div></div>
+    <div class="kpi overdue"><div class="num" id="k-overdue">-</div><div class="lbl">마감 지남</div></div>
     <div class="kpi"><div class="num" id="k-empty">-</div><div class="lbl">금주계획 미입력</div></div>
   </div>
 
@@ -195,6 +198,7 @@
     <div class="filter-line">
       <span class="filter-label">상태</span>
       <div class="filters" id="filters"></div>
+      <button class="toggle-all-btn" id="toggle-dept-btn" onclick="toggleAllDepts()">부서 전체 접기</button>
       <button class="toggle-all-btn" id="toggle-all-btn" onclick="toggleAll()">전체 펼치기</button>
     </div>
     <div class="filter-line">
@@ -359,6 +363,7 @@ function renderKpis(){
   document.getElementById('k-done').textContent = tasks.filter(t=>t.status==='완료').length;
   document.getElementById('k-prog').textContent = tasks.filter(t=>t.status==='진행중').length;
   document.getElementById('k-wait').textContent = tasks.filter(t=>t.status==='예정'||t.status==='확인중').length;
+  document.getElementById('k-overdue').textContent = tasks.filter(t=>dueUrgency(t).cls==='overdue').length;
   document.getElementById('k-empty').textContent = tasks.filter(t=>!t.next).length;
 }
 
@@ -579,6 +584,7 @@ function renderList(){
   });
 
   updateToggleAllBtn();
+  updateToggleDeptBtn();
 }
 
 function updateSyncTime(){
@@ -639,6 +645,27 @@ function updateToggleAllBtn(){
   btn.textContent = allOpen ? '전체 접기' : '전체 펼치기';
 }
 
+function toggleAllDepts(){
+  const items = document.querySelectorAll('#list .dept-section');
+  if(items.length === 0) return;
+  const shouldOpen = Array.from(items).some(el => !el.open);
+  items.forEach(el => {
+    el.open = shouldOpen;
+    const deptKey = el.querySelector('.dept-name')?.textContent || '';
+    if(shouldOpen){ collapsedDepts.delete(deptKey); } else { collapsedDepts.add(deptKey); }
+  });
+  updateToggleDeptBtn();
+}
+
+function updateToggleDeptBtn(){
+  const btn = document.getElementById('toggle-dept-btn');
+  if(!btn) return;
+  const items = document.querySelectorAll('#list .dept-section');
+  if(items.length === 0){ btn.textContent = '부서 전체 접기'; return; }
+  const allOpen = Array.from(items).every(el => el.open);
+  btn.textContent = allOpen ? '부서 전체 접기' : '부서 전체 펼치기';
+}
+
 function manualRefresh(){
   loadAndRender();
 }
@@ -654,6 +681,7 @@ document.getElementById('list').addEventListener('toggle', (e)=>{
     }else{
       collapsedDepts.add(deptKey);
     }
+    updateToggleDeptBtn();
   }
 }, true);
 
