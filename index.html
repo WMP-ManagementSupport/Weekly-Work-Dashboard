@@ -142,15 +142,18 @@
   .state-msg{text-align:center;color:var(--sub);font-size:13px;padding:60px 0;}
   .state-msg.error{color:var(--hold);}
 
-  /* summary table view */
-  /* summary view (요약보기) - 카드 보기의 flow 박스 비율을 그대로 재사용한 그리드 */
+  /* summary view (요약보기) - 담당자별 섹션 + 카드 보기의 flow 박스 비율을 그대로 재사용한 그리드 */
+  .summary-owner-section{margin-bottom:24px;}
+  .summary-owner-section:last-child{margin-bottom:0;}
+  .summary-owner-header{display:flex;align-items:center;gap:9px;margin-bottom:11px;padding-bottom:8px;border-bottom:1px solid var(--line);}
+  .summary-owner-name{font-size:14.5px;font-weight:800;color:var(--ink);}
+  .summary-owner-dept{font-size:10.5px;font-weight:700;color:var(--sub);background:#f0f1f3;padding:3px 9px;
+        border-radius:20px;letter-spacing:.02em;white-space:nowrap;}
+  .summary-owner-count{font-size:11.5px;color:var(--faint);margin-left:auto;}
   .summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;}
   .summary-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px 16px;}
-  .summary-card-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
-  .summary-card-dept{font-size:10px;font-weight:800;color:var(--sub);background:#f0f1f3;padding:3px 9px;
-        border-radius:20px;letter-spacing:.02em;white-space:nowrap;}
-  .summary-card-owner{font-size:12px;font-weight:800;color:var(--accent);white-space:nowrap;}
   .summary-card-title{font-size:13.5px;font-weight:800;color:var(--ink);margin-bottom:12px;line-height:1.4;}
+
 
   @media(max-width:720px){
     .kpis{grid-template-columns:repeat(3,1fr);}
@@ -648,31 +651,11 @@ function renderSummaryView(){
   });
   const deptKeys = sortedDeptKeys(deptGroups);
 
-  const ordered = [];
-  deptKeys.forEach(deptKey=>{
-    const items = deptGroups.get(deptKey);
-    const ownerGroups = new Map();
-    items.forEach(t=>{
-      const key = t.owner || '미지정';
-      if(!ownerGroups.has(key)) ownerGroups.set(key, []);
-      ownerGroups.get(key).push(t);
-    });
-    ownerGroups.forEach((ownerItems, ownerName)=>{
-      ownerItems.forEach(t=> ordered.push({dept: deptKey, owner: ownerName, task: t}));
-    });
-  });
-
   const box = (label, text, emptyLabel, cls)=>
     `<div class="box ${cls}"><span class="lbl">${label}</span>${text ? highlight(text, term) : `<span class="empty">${emptyLabel}</span>`}</div>`;
 
-  const cards = ordered.map(r=>{
-    const t = r.task;
-    return `
+  const cardHtml = (t)=>`
       <div class="summary-card">
-        <div class="summary-card-head">
-          <span class="summary-card-dept">${r.dept}</span>
-          <span class="summary-card-owner">${highlight(r.owner, term)}</span>
-        </div>
         <div class="summary-card-title">${highlight(t.title, term)}</div>
         <div class="flow">
           ${box('지난주 업무', t.last, '지난주 업무 내용 없음', 'last')}
@@ -682,9 +665,30 @@ function renderSummaryView(){
           ${box('다음주 업무', t.remark, '다음주 업무 내용 없음', 'remark')}
         </div>
       </div>`;
-  }).join('');
 
-  list.innerHTML = `<div class="summary-grid">${cards}</div>`;
+  const sections = [];
+  deptKeys.forEach(deptKey=>{
+    const items = deptGroups.get(deptKey);
+    const ownerGroups = new Map();
+    items.forEach(t=>{
+      const key = t.owner || '미지정';
+      if(!ownerGroups.has(key)) ownerGroups.set(key, []);
+      ownerGroups.get(key).push(t);
+    });
+    ownerGroups.forEach((ownerItems, ownerName)=>{
+      sections.push(`
+        <div class="summary-owner-section">
+          <div class="summary-owner-header">
+            <span class="summary-owner-name">${highlight(ownerName, term)}</span>
+            <span class="summary-owner-dept">${deptKey}</span>
+            <span class="summary-owner-count">${ownerItems.length}건</span>
+          </div>
+          <div class="summary-grid">${ownerItems.map(cardHtml).join('')}</div>
+        </div>`);
+    });
+  });
+
+  list.innerHTML = sections.join('');
 }
 
 function toggleViewMode(){
