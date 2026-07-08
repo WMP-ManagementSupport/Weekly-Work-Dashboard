@@ -89,6 +89,8 @@
   .flow .next{background:#e3ebf7;border:1px solid #cbdaef;}
   .flow .arrow{display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:14px;}
   .empty{color:var(--faint);font-style:italic;}
+  .remark{margin-top:8px;border-radius:10px;padding:10px 13px;font-size:12px;line-height:1.6;color:#5b5240;background:#fbf7ee;border:1px solid #ecdfc0;white-space:pre-line;}
+  .remark .lbl{display:block;font-size:10px;font-weight:800;color:var(--wait);letter-spacing:.03em;margin-bottom:4px;text-transform:uppercase;}
   mark{background:#fde9a8;color:inherit;border-radius:3px;padding:0 1px;}
 
   .dept-section{margin-bottom:32px;}
@@ -326,6 +328,7 @@ async function fetchTasksFromSheet(gid){
     const next   = String(get(7)).trim();
     const status = String(get(8)).trim();
     const due    = String(get(9)).trim();
+    const remark = String(get(10)).trim();
 
     if(!title) return; // 업무명이 없는 빈 행은 건너뜀
 
@@ -336,7 +339,7 @@ async function fetchTasksFromSheet(gid){
       .join('\n');
 
     const desc = [cleanText(descMain), cleanText(descDetail)].filter(Boolean).join('\n');
-    result.push({dept, cat, owner, title, desc, last, next, status, due});
+    result.push({dept, cat, owner, title, desc, last, next, status, due, remark: cleanText(remark)});
   });
 
   return result;
@@ -508,6 +511,7 @@ function renderList(){
               <div class="arrow">→</div>
               <div class="box next"><span class="lbl">금주 계획</span>${t.next ? t.next : '<span class="empty">금주 계획 미입력</span>'}</div>
             </div>
+            ${t.remark ? `<div class="remark"><span class="lbl">비고</span>${t.remark}</div>` : ""}
           </div>`;
         ownerBlock.appendChild(el);
       });
