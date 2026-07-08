@@ -143,22 +143,14 @@
   .state-msg.error{color:var(--hold);}
 
   /* summary table view */
-  .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card);}
-  .summary-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:900px;}
-  .summary-table th{background:#f7f8fa;color:var(--sub);font-weight:700;font-size:11px;text-align:left;
-        padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0;}
-  .summary-table td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top;
-        white-space:pre-line;line-height:1.55;color:var(--ink);}
-  .summary-table tbody tr:last-child td{border-bottom:none;}
-  .summary-table tbody tr:hover{background:#fafbfc;}
-  .summary-table td.dept-cell{color:var(--sub);font-weight:700;white-space:nowrap;}
-  .summary-table td.owner-cell{color:var(--accent);font-weight:700;white-space:nowrap;}
-  .summary-table td.title-cell{font-weight:800;color:var(--ink);}
-  .summary-table td.empty-cell{color:var(--faint);font-style:italic;}
-  .summary-table col.col-dept{width:6%;}
-  .summary-table col.col-owner{width:7%;}
-  .summary-table col.col-title{width:13%;}
-  .summary-table col.col-flow{width:24.67%;}
+  /* summary view (요약보기) - 카드 보기의 flow 박스 비율을 그대로 재사용한 그리드 */
+  .summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;}
+  .summary-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px 16px;}
+  .summary-card-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .summary-card-dept{font-size:10px;font-weight:800;color:var(--sub);background:#f0f1f3;padding:3px 9px;
+        border-radius:20px;letter-spacing:.02em;white-space:nowrap;}
+  .summary-card-owner{font-size:12px;font-weight:800;color:var(--accent);white-space:nowrap;}
+  .summary-card-title{font-size:13.5px;font-weight:800;color:var(--ink);margin-bottom:12px;line-height:1.4;}
 
   @media(max-width:720px){
     .kpis{grid-template-columns:repeat(3,1fr);}
@@ -222,7 +214,7 @@
       <div class="filters" id="filters"></div>
       <button class="toggle-all-btn" id="toggle-dept-btn" onclick="toggleAllDepts()">부서 전체 접기</button>
       <button class="toggle-all-btn" id="toggle-all-btn" onclick="toggleAll()">전체 펼치기</button>
-      <button class="toggle-all-btn" id="view-toggle-btn" onclick="toggleViewMode()">표로 보기</button>
+      <button class="toggle-all-btn" id="view-toggle-btn" onclick="toggleViewMode()">요약 보기</button>
     </div>
     <div class="filter-line">
       <span class="filter-label">담당자</span>
@@ -279,7 +271,7 @@ async function fetchWeekLabel(gid){
 let tasks = [];
 let activeStatus = "전체";
 let activeOwner = "전체";
-let viewMode = "card"; // 'card' | 'table'
+let viewMode = "card"; // 'card' | 'summary'
 let searchText = "";
 let searchDebounceTimer = null;
 let collapsedDepts = new Set();
@@ -525,8 +517,8 @@ function sortedDeptKeys(deptGroups){
 }
 
 function renderList(){
-  if(viewMode === 'table'){
-    renderTableView();
+  if(viewMode === 'summary'){
+    renderSummaryView();
   }else{
     renderCardView();
   }
@@ -636,7 +628,7 @@ function renderCardView(){
   updateToggleDeptBtn();
 }
 
-function renderTableView(){
+function renderSummaryView(){
   const list = document.getElementById('list');
   list.innerHTML = "";
   const term = searchText;
@@ -656,7 +648,7 @@ function renderTableView(){
   });
   const deptKeys = sortedDeptKeys(deptGroups);
 
-  const rows = [];
+  const ordered = [];
   deptKeys.forEach(deptKey=>{
     const items = deptGroups.get(deptKey);
     const ownerGroups = new Map();
@@ -666,45 +658,37 @@ function renderTableView(){
       ownerGroups.get(key).push(t);
     });
     ownerGroups.forEach((ownerItems, ownerName)=>{
-      ownerItems.forEach(t=> rows.push({dept: deptKey, owner: ownerName, task: t}));
+      ownerItems.forEach(t=> ordered.push({dept: deptKey, owner: ownerName, task: t}));
     });
   });
 
-  const cell = (text)=> text ? highlight(text, term) : '<span class="empty-cell">내용 없음</span>';
+  const box = (label, text, emptyLabel, cls)=>
+    `<div class="box ${cls}"><span class="lbl">${label}</span>${text ? highlight(text, term) : `<span class="empty">${emptyLabel}</span>`}</div>`;
 
-  const bodyRows = rows.map(r=>{
+  const cards = ordered.map(r=>{
     const t = r.task;
     return `
-      <tr>
-        <td class="dept-cell">${r.dept}</td>
-        <td class="owner-cell">${highlight(r.owner, term)}</td>
-        <td class="title-cell">${highlight(t.title, term)}</td>
-        <td>${cell(t.last)}</td>
-        <td>${cell(t.next)}</td>
-        <td>${cell(t.remark)}</td>
-      </tr>`;
+      <div class="summary-card">
+        <div class="summary-card-head">
+          <span class="summary-card-dept">${r.dept}</span>
+          <span class="summary-card-owner">${highlight(r.owner, term)}</span>
+        </div>
+        <div class="summary-card-title">${highlight(t.title, term)}</div>
+        <div class="flow">
+          ${box('지난주 업무', t.last, '지난주 업무 내용 없음', 'last')}
+          <div class="arrow">→</div>
+          ${box('이번주 업무', t.next, '이번주 업무 미입력', 'next')}
+          <div class="arrow">→</div>
+          ${box('다음주 업무', t.remark, '다음주 업무 내용 없음', 'remark')}
+        </div>
+      </div>`;
   }).join('');
 
-  list.innerHTML = `
-    <div class="table-wrap">
-      <table class="summary-table">
-        <colgroup>
-          <col class="col-dept"><col class="col-owner"><col class="col-title">
-          <col class="col-flow"><col class="col-flow"><col class="col-flow">
-        </colgroup>
-        <thead>
-          <tr>
-            <th>부서</th><th>담당자</th><th>업무명</th>
-            <th>지난주 업무</th><th>이번주 업무</th><th>다음주 업무</th>
-          </tr>
-        </thead>
-        <tbody>${bodyRows}</tbody>
-      </table>
-    </div>`;
+  list.innerHTML = `<div class="summary-grid">${cards}</div>`;
 }
 
 function toggleViewMode(){
-  viewMode = viewMode === 'table' ? 'card' : 'table';
+  viewMode = viewMode === 'summary' ? 'card' : 'summary';
   updateViewToggleBtn();
   renderList();
 }
@@ -712,11 +696,11 @@ function toggleViewMode(){
 function updateViewToggleBtn(){
   const btn = document.getElementById('view-toggle-btn');
   if(!btn) return;
-  btn.textContent = viewMode === 'table' ? '카드로 보기' : '표로 보기';
+  btn.textContent = viewMode === 'summary' ? '카드로 보기' : '요약 보기';
   const deptBtn = document.getElementById('toggle-dept-btn');
   const allBtn = document.getElementById('toggle-all-btn');
-  if(deptBtn) deptBtn.style.display = viewMode === 'table' ? 'none' : '';
-  if(allBtn) allBtn.style.display = viewMode === 'table' ? 'none' : '';
+  if(deptBtn) deptBtn.style.display = viewMode === 'summary' ? 'none' : '';
+  if(allBtn) allBtn.style.display = viewMode === 'summary' ? 'none' : '';
 }
 
 function updateSyncTime(){
