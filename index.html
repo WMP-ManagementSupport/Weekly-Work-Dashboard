@@ -349,7 +349,8 @@ async function fetchTasksFromSheet(gid){
       const cell = c[i];
       return (cell.f !== undefined && cell.f !== null && cell.f !== '') ? cell.f : (cell.v ?? '');
     };
-    // 열 순서: 부서, 업무구분, 담당자, 업무명, 업무 설명, 세부내용, 지난주 업무, 이번주 업무, 다음주 업무, 상태, 마감일
+    // 열 순서: 부서, 업무구분, 담당자, 업무명, 업무 설명, 세부내용, 지난주 업무, (이번주 업무 열은 더 이상 사용하지 않음), 다음주 업무, 상태, 마감일
+    // ※ "세부내용" 열의 내용을 그대로 "이번주 업무" 박스에 반영합니다. 시트의 "이번주 업무" 열은 읽지 않습니다.
     const dept   = String(get(0)).trim();
     const cat    = String(get(1)).trim();
     const owner  = String(get(2)).trim();
@@ -357,7 +358,6 @@ async function fetchTasksFromSheet(gid){
     const descMain   = String(get(4)).trim();
     const descDetail = String(get(5)).trim();
     const last   = String(get(6)).trim();
-    const next   = String(get(7)).trim();
     const remark = String(get(8)).trim();
     const status = String(get(9)).trim();
     const due    = String(get(10)).trim();
@@ -370,7 +370,8 @@ async function fetchTasksFromSheet(gid){
       .filter(line => line.length > 0)
       .join('\n');
 
-    const desc = [cleanText(descMain), cleanText(descDetail)].filter(Boolean).join('\n');
+    const desc = cleanText(descMain);
+    const next = cleanText(descDetail); // 세부내용 → 이번주 업무로 반영
     result.push({dept, cat, owner, title, desc, last, next, status, due, remark: cleanText(remark)});
   });
 
