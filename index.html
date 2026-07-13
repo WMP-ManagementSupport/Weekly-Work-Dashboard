@@ -221,7 +221,7 @@
 
   <div class="filters-row">
     <div class="filter-line">
-      <span class="filter-label">상태</span>
+      <span class="filter-label" id="status-filter-label">상태</span>
       <div class="filters" id="filters"></div>
       <button class="toggle-all-btn" id="toggle-dept-btn" onclick="toggleAllDepts()">부서 전체 접기</button>
       <button class="toggle-all-btn" id="toggle-all-btn" onclick="toggleAll()">전체 펼치기</button>
@@ -768,7 +768,7 @@ function renderSummaryView(){
 function getFilteredMonthlyGroups(){
   const term = searchText.toLowerCase();
   return monthlyCompletedGroups.filter(g=>
-    (activeStatus === "전체" || g.status === activeStatus) &&
+    g.status === '완료' &&
     (activeOwner === "전체" || (g.owner || '미지정') === activeOwner) &&
     (!term || g.title.toLowerCase().includes(term) || (g.owner || '').toLowerCase().includes(term))
   );
@@ -778,12 +778,12 @@ function renderMonthlyView(){
   const list = document.getElementById('list');
   list.innerHTML = "";
   const term = searchText;
-  // 이번 달 전체 주차(현재 주 시트에 더 이상 없는 과거 업무 포함)에서 완료 업무를 모아 보여준다
+  // 이번 달 전체 주차(현재 주 시트에 더 이상 없는 과거 업무 포함)에서 상태값이 '완료'인 업무만 모아 보여준다
   const shown = getFilteredMonthlyGroups();
   const monthLabel = monthKeyOf(WEEKS[CURRENT_WEEK_INDEX].label) || '이번 달';
 
   if(shown.length === 0){
-    list.innerHTML = `<div class="state-msg">${term ? '검색 결과가 없습니다.' : monthLabel + ' 완료 업무가 아직 없습니다.'}</div>`;
+    list.innerHTML = `<div class="state-msg">${term ? '검색 결과가 없습니다.' : monthLabel + ' 완료(상태: 완료) 업무가 아직 없습니다.'}</div>`;
     return;
   }
 
@@ -867,6 +867,13 @@ function updateViewToggleBtn(){
   const showListOnlyControls = viewMode === 'card';
   if(deptBtn) deptBtn.style.display = showListOnlyControls ? '' : 'none';
   if(allBtn) allBtn.style.display = showListOnlyControls ? '' : 'none';
+
+  // 월별 완료 업무는 항상 상태값 '완료' 업무만 보여주므로 상태 칩은 숨김
+  const statusLabel = document.getElementById('status-filter-label');
+  const statusFilters = document.getElementById('filters');
+  const showStatusFilter = viewMode !== 'monthly';
+  if(statusLabel) statusLabel.style.display = showStatusFilter ? '' : 'none';
+  if(statusFilters) statusFilters.style.display = showStatusFilter ? '' : 'none';
 }
 
 function updateSyncTime(){
