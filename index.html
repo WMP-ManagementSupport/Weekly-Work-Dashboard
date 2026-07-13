@@ -788,7 +788,7 @@ function renderMonthlyView(){
   const cardHtml = (t)=>`
       <div class="summary-card">
         <div class="summary-card-title">${highlight(t.title, term)}</div>
-        ${box(t.last)}
+        <div class="flow">${box(t.last)}</div>
       </div>`;
 
   const sections = [`<div class="monthly-heading">${monthLabel} 완료 업무 누적 · ${shown.length}건</div>`];
