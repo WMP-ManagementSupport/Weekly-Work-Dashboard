@@ -679,7 +679,7 @@ function renderCardView(){
           <div class="task-body">
             ${t.desc ? `<div class="desc">${t.desc}</div>` : ""}
             <div class="flow">
-              <div class="box last"><span class="lbl">완료 업무 (이달 누적)</span>${t.last ? t.last : '<span class="empty">이번 달 완료 업무 없음</span>'}</div>
+              <div class="box last"><span class="lbl">완료 업무</span>${t.last ? t.last : '<span class="empty">이번 달 완료 업무 없음</span>'}</div>
               <div class="arrow">→</div>
               <div class="box next"><span class="lbl">이번주 업무</span>${t.next ? t.next : '<span class="empty">이번주 업무 미입력</span>'}</div>
             </div>
@@ -724,7 +724,7 @@ function renderSummaryView(){
       <div class="summary-card">
         <div class="summary-card-title">${highlight(t.title, term)}</div>
         <div class="flow">
-          ${box('완료 업무 (이달 누적)', t.last, '이번 달 완료 업무 없음', 'last')}
+          ${box('완료 업무', t.last, '이번 달 완료 업무 없음', 'last')}
           <div class="arrow">→</div>
           ${box('이번주 업무', t.next, '이번주 업무 미입력', 'next')}
         </div>
