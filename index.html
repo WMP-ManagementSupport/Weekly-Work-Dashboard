@@ -102,6 +102,8 @@
   .flow .arrow{display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:14px;}
   .empty{color:var(--faint);font-style:italic;}
   mark{background:#fde9a8;color:inherit;border-radius:3px;padding:0 1px;}
+  .cell-link{color:var(--accent);text-decoration:underline;text-decoration-color:rgba(59,85,128,.35);text-underline-offset:2px;word-break:break-all;}
+  .cell-link:hover{text-decoration-color:var(--accent);}
 
   .dept-section{margin-bottom:32px;}
   .dept-section:last-child{margin-bottom:0;}
@@ -540,6 +542,24 @@ function highlight(text, term){
   }
 }
 
+// 텍스트 안의 URL(http/https, www.)을 자동으로 감지해서 클릭 가능한 링크로 변환
+function linkify(text){
+  if(!text) return text;
+  const urlRe = /(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+)/g;
+  return text.replace(urlRe, (match)=>{
+    // 문장 끝에 자주 붙는 문장부호/괄호는 링크 밖으로 빼줌
+    let trail = '';
+    const m = match.match(/[.,)\]}!?;:'"]+$/);
+    if(m){
+      trail = m[0];
+      match = match.slice(0, -trail.length);
+    }
+    if(!match) return match + trail;
+    const href = /^https?:\/\//i.test(match) ? match : ('https://' + match);
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="cell-link" onclick="event.stopPropagation()">${match}</a>${trail}`;
+  });
+}
+
 function matchesSearch(t, term){
   if(!term) return true;
   const q = term.toLowerCase();
@@ -677,11 +697,11 @@ function renderCardView(){
             </div>
           </summary>
           <div class="task-body">
-            ${t.desc ? `<div class="desc">${t.desc}</div>` : ""}
+            ${t.desc ? `<div class="desc">${linkify(t.desc)}</div>` : ""}
             <div class="flow">
-              <div class="box last"><span class="lbl">완료 업무</span>${t.last ? t.last : '<span class="empty">이번 달 완료 업무 없음</span>'}</div>
+              <div class="box last"><span class="lbl">완료 업무</span>${t.last ? linkify(t.last) : '<span class="empty">이번 달 완료 업무 없음</span>'}</div>
               <div class="arrow">→</div>
-              <div class="box next"><span class="lbl">이번주 업무</span>${t.next ? t.next : '<span class="empty">이번주 업무 미입력</span>'}</div>
+              <div class="box next"><span class="lbl">이번주 업무</span>${t.next ? linkify(t.next) : '<span class="empty">이번주 업무 미입력</span>'}</div>
             </div>
           </div>`;
         ownerBlock.appendChild(el);
@@ -718,7 +738,7 @@ function renderSummaryView(){
   const deptKeys = sortedDeptKeys(deptGroups);
 
   const box = (label, text, emptyLabel, cls)=>
-    `<div class="box ${cls}"><span class="lbl">${label}</span>${text ? highlight(text, term) : `<span class="empty">${emptyLabel}</span>`}</div>`;
+    `<div class="box ${cls}"><span class="lbl">${label}</span>${text ? linkify(highlight(text, term)) : `<span class="empty">${emptyLabel}</span>`}</div>`;
 
   const cardHtml = (t)=>`
       <div class="summary-card">
