@@ -85,10 +85,20 @@
   .toggle-all-btn:hover{border-color:var(--accent);}
 
   /* task cards */
-  .flow .box{border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.55;color:var(--ink);font-weight:500;}
+  .flow .box{border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.55;color:var(--ink);font-weight:500;white-space:pre-line;}
   .flow .box .lbl{display:block;font-size:10px;font-weight:800;color:var(--accent);letter-spacing:.03em;margin-bottom:5px;text-transform:uppercase;}
   .flow .last{background:#eceef1;border:1px solid #dde0e5;}
-  .flow .next{background:#e3ebf7;border:1px solid #cbdaef;}
+  .flow .next{
+    background:#e9f0fc;
+    border:2px solid var(--accent);
+    box-shadow:0 3px 10px rgba(59,85,128,.16);
+    padding:14px 16px;
+    font-size:13.5px;
+    font-weight:600;
+    position:relative;
+  }
+  .flow .next .lbl{font-size:11px;color:var(--accent);letter-spacing:.04em;}
+  .flow .next .lbl::before{content:"● ";font-size:9px;}
   .flow .arrow{display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:14px;}
   .empty{color:var(--faint);font-style:italic;}
   .remark{border-radius:10px;padding:10px 13px;font-size:12px;line-height:1.6;color:#5b5240;background:#fbf7ee;border:1px solid #ecdfc0;white-space:pre-line;}
