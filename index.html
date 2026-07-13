@@ -83,7 +83,6 @@
   .owner-chip.active{background:var(--accent);border-color:var(--accent);}
   .toggle-all-btn{font-size:12.5px;color:var(--accent);background:var(--accent-soft);border:1px solid transparent;border-radius:20px;padding:7px 14px;cursor:pointer;font-weight:600;white-space:nowrap;}
   .toggle-all-btn:hover{border-color:var(--accent);}
-  .toggle-all-btn.active{background:var(--accent);color:#fff;}
 
   /* task cards */
   .flow .box{border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.55;color:var(--ink);font-weight:500;white-space:pre-line;}
@@ -158,7 +157,6 @@
         border-radius:20px;letter-spacing:.02em;white-space:nowrap;}
   .summary-owner-count{font-size:11.5px;color:var(--faint);margin-left:auto;}
   .summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;}
-  .monthly-heading{font-size:14.5px;font-weight:800;color:var(--ink);margin:2px 2px 16px;padding-bottom:12px;border-bottom:2px solid var(--line);}
   .summary-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px 16px;}
   .summary-card-title{font-size:13.5px;font-weight:800;color:var(--ink);margin-bottom:12px;line-height:1.4;}
 
@@ -221,12 +219,11 @@
 
   <div class="filters-row">
     <div class="filter-line">
-      <span class="filter-label" id="status-filter-label">상태</span>
+      <span class="filter-label">상태</span>
       <div class="filters" id="filters"></div>
       <button class="toggle-all-btn" id="toggle-dept-btn" onclick="toggleAllDepts()">부서 전체 접기</button>
       <button class="toggle-all-btn" id="toggle-all-btn" onclick="toggleAll()">전체 펼치기</button>
       <button class="toggle-all-btn" id="view-toggle-btn" onclick="toggleViewMode()">요약 보기</button>
-      <button class="toggle-all-btn" id="monthly-toggle-btn" onclick="toggleMonthlyView()">월별 완료 업무</button>
     </div>
     <div class="filter-line">
       <span class="filter-label">담당자</span>
@@ -283,11 +280,9 @@ async function fetchWeekLabel(gid){
 }
 
 let tasks = [];
-let monthlyCompletedGroups = []; // 이번 달 전체 완료 업무(현재 주 시트에 없는 과거 업무 포함)
 let activeStatus = "전체";
 let activeOwner = "전체";
-let viewMode = "card"; // 'card' | 'summary' | 'monthly'
-let lastListMode = "card"; // 'monthly' 보기에서 나갈 때 되돌아갈 모드
+let viewMode = "card"; // 'card' | 'summary'
 let searchText = "";
 let searchDebounceTimer = null;
 let collapsedDepts = new Set();
@@ -368,7 +363,6 @@ function weeksInCurrentMonth(){
 
 // 같은 달의 이전 주차들을 모두 불러와 "완료 업무"를 업무 단위로 누적 병합한다.
 // (부서+담당자+업무명이 같으면 같은 업무로 보고 주차별 완료 내역을 이어붙임)
-// map에는 그 달에 등장한 모든 업무가 들어있다 — 현재 주 시트에 더 이상 없는(과거에만 있던) 업무도 포함됨.
 async function fetchMonthlyCompleted(baseTasks){
   const monthWeeks = weeksInCurrentMonth();      // [현재, ..., 그 달 첫 주]
   const olderWeeks = monthWeeks.slice(1);        // 현재 주는 baseTasks로 이미 갖고 있으므로 제외
@@ -378,29 +372,27 @@ async function fetchMonthlyCompleted(baseTasks){
     chronological.map(w => fetchTasksFromSheet(w.gid).catch(()=>[]))
   );
 
-  const map = new Map(); // key -> {dept,cat,owner,title,status,entries:[{tag,text}, ...]} (과거 -> 최신 순)
+  const map = new Map(); // key -> [{tag, text}, ...] (과거 -> 최신 순)
   const keyOf = (t)=> `${t.dept}|||${t.owner}|||${t.title}`;
-
-  const addEntry = (t, tag)=>{
-    if(!t.last) return;
-    const key = keyOf(t);
-    if(!map.has(key)){
-      map.set(key, {dept:t.dept, cat:t.cat, owner:t.owner, title:t.title, status:t.status, entries:[]});
-    }
-    const rec = map.get(key);
-    // 최신 주차에서 값이 갱신되면 그 값(부서/구분/상태 등)을 따라감
-    rec.dept = t.dept; rec.cat = t.cat; rec.owner = t.owner; rec.title = t.title; rec.status = t.status;
-    rec.entries.push({tag, text: t.last});
-  };
 
   chronological.forEach((w, idx)=>{
     const tag = weekTagOf(w.label);
-    (olderResults[idx] || []).forEach(t => addEntry(t, tag));
+    (olderResults[idx] || []).forEach(t=>{
+      if(!t.last) return;
+      const key = keyOf(t);
+      if(!map.has(key)) map.set(key, []);
+      map.get(key).push({tag, text: t.last});
+    });
   });
 
   // 현재(가장 최신) 주차는 맨 마지막에 추가
   const curTag = weekTagOf(WEEKS[CURRENT_WEEK_INDEX].label);
-  baseTasks.forEach(t => addEntry(t, curTag));
+  baseTasks.forEach(t=>{
+    if(!t.last) return;
+    const key = keyOf(t);
+    if(!map.has(key)) map.set(key, []);
+    map.get(key).push({tag: curTag, text: t.last});
+  });
 
   return {map, keyOf, weekCount: monthWeeks.length};
 }
@@ -598,8 +590,6 @@ function sortedDeptKeys(deptGroups){
 function renderList(){
   if(viewMode === 'summary'){
     renderSummaryView();
-  }else if(viewMode === 'monthly'){
-    renderMonthlyView();
   }else{
     renderCardView();
   }
@@ -689,7 +679,7 @@ function renderCardView(){
           <div class="task-body">
             ${t.desc ? `<div class="desc">${t.desc}</div>` : ""}
             <div class="flow">
-              <div class="box last"><span class="lbl">완료 업무</span>${t.last ? t.last : '<span class="empty">이번 달 완료 업무 없음</span>'}</div>
+              <div class="box last"><span class="lbl">완료 업무 (이달 누적)</span>${t.last ? t.last : '<span class="empty">이번 달 완료 업무 없음</span>'}</div>
               <div class="arrow">→</div>
               <div class="box next"><span class="lbl">이번주 업무</span>${t.next ? t.next : '<span class="empty">이번주 업무 미입력</span>'}</div>
             </div>
@@ -734,7 +724,7 @@ function renderSummaryView(){
       <div class="summary-card">
         <div class="summary-card-title">${highlight(t.title, term)}</div>
         <div class="flow">
-          ${box('완료 업무', t.last, '이번 달 완료 업무 없음', 'last')}
+          ${box('완료 업무 (이달 누적)', t.last, '이번 달 완료 업무 없음', 'last')}
           <div class="arrow">→</div>
           ${box('이번주 업무', t.next, '이번주 업무 미입력', 'next')}
         </div>
@@ -765,115 +755,20 @@ function renderSummaryView(){
   list.innerHTML = sections.join('');
 }
 
-function getFilteredMonthlyGroups(){
-  const term = searchText.toLowerCase();
-  return monthlyCompletedGroups.filter(g=>
-    g.status === '완료' &&
-    (activeOwner === "전체" || (g.owner || '미지정') === activeOwner) &&
-    (!term || g.title.toLowerCase().includes(term) || (g.owner || '').toLowerCase().includes(term))
-  );
-}
-
-function renderMonthlyView(){
-  const list = document.getElementById('list');
-  list.innerHTML = "";
-  const term = searchText;
-  // 이번 달 전체 주차(현재 주 시트에 더 이상 없는 과거 업무 포함)에서 상태값이 '완료'인 업무만 모아 보여준다
-  const shown = getFilteredMonthlyGroups();
-  const monthLabel = monthKeyOf(WEEKS[CURRENT_WEEK_INDEX].label) || '이번 달';
-
-  if(shown.length === 0){
-    list.innerHTML = `<div class="state-msg">${term ? '검색 결과가 없습니다.' : monthLabel + ' 완료(상태: 완료) 업무가 아직 없습니다.'}</div>`;
-    return;
-  }
-
-  const deptGroups = new Map();
-  shown.forEach(g=>{
-    const key = g.dept || '기타';
-    if(!deptGroups.has(key)) deptGroups.set(key, []);
-    deptGroups.get(key).push(g);
-  });
-  const deptKeys = sortedDeptKeys(deptGroups);
-
-  const box = (entries)=>{
-    const text = entries.length > 1
-      ? entries.map(e => `[${e.tag}] ${e.text}`).join('\n')
-      : (entries[0] ? entries[0].text : '');
-    return `<div class="box last"><span class="lbl">완료 업무</span>${text ? highlight(text, term) : '<span class="empty">완료 업무 없음</span>'}</div>`;
-  };
-
-  const cardHtml = (g)=>`
-      <div class="summary-card">
-        <div class="summary-card-title">${highlight(g.title, term)}</div>
-        <div class="flow">${box(g.entries)}</div>
-      </div>`;
-
-  const sections = [`<div class="monthly-heading">${monthLabel} 완료 업무 누적 · ${shown.length}건</div>`];
-  deptKeys.forEach(deptKey=>{
-    const items = deptGroups.get(deptKey);
-    const ownerGroups = new Map();
-    items.forEach(g=>{
-      const key = g.owner || '미지정';
-      if(!ownerGroups.has(key)) ownerGroups.set(key, []);
-      ownerGroups.get(key).push(g);
-    });
-    ownerGroups.forEach((ownerItems, ownerName)=>{
-      sections.push(`
-        <div class="summary-owner-section">
-          <div class="summary-owner-header">
-            <span class="summary-owner-name">${highlight(ownerName, term)}</span>
-            <span class="summary-owner-dept">${deptKey}</span>
-            <span class="summary-owner-count">${ownerItems.length}건</span>
-          </div>
-          <div class="summary-grid">${ownerItems.map(cardHtml).join('')}</div>
-        </div>`);
-    });
-  });
-
-  list.innerHTML = sections.join('');
-}
-
 function toggleViewMode(){
   viewMode = viewMode === 'summary' ? 'card' : 'summary';
-  lastListMode = viewMode;
-  updateViewToggleBtn();
-  renderList();
-}
-
-function toggleMonthlyView(){
-  if(viewMode === 'monthly'){
-    viewMode = lastListMode || 'card';
-  }else{
-    lastListMode = (viewMode === 'summary') ? 'summary' : 'card';
-    viewMode = 'monthly';
-  }
   updateViewToggleBtn();
   renderList();
 }
 
 function updateViewToggleBtn(){
   const btn = document.getElementById('view-toggle-btn');
-  const monthlyBtn = document.getElementById('monthly-toggle-btn');
-  if(btn){
-    btn.textContent = viewMode === 'summary' ? '카드로 보기' : '요약 보기';
-    btn.style.display = viewMode === 'monthly' ? 'none' : '';
-  }
-  if(monthlyBtn){
-    monthlyBtn.textContent = viewMode === 'monthly' ? '← 목록으로' : '월별 완료 업무';
-    monthlyBtn.classList.toggle('active', viewMode === 'monthly');
-  }
+  if(!btn) return;
+  btn.textContent = viewMode === 'summary' ? '카드로 보기' : '요약 보기';
   const deptBtn = document.getElementById('toggle-dept-btn');
   const allBtn = document.getElementById('toggle-all-btn');
-  const showListOnlyControls = viewMode === 'card';
-  if(deptBtn) deptBtn.style.display = showListOnlyControls ? '' : 'none';
-  if(allBtn) allBtn.style.display = showListOnlyControls ? '' : 'none';
-
-  // 월별 완료 업무는 항상 상태값 '완료' 업무만 보여주므로 상태 칩은 숨김
-  const statusLabel = document.getElementById('status-filter-label');
-  const statusFilters = document.getElementById('filters');
-  const showStatusFilter = viewMode !== 'monthly';
-  if(statusLabel) statusLabel.style.display = showStatusFilter ? '' : 'none';
-  if(statusFilters) statusFilters.style.display = showStatusFilter ? '' : 'none';
+  if(deptBtn) deptBtn.style.display = viewMode === 'summary' ? 'none' : '';
+  if(allBtn) allBtn.style.display = viewMode === 'summary' ? 'none' : '';
 }
 
 function updateSyncTime(){
@@ -906,8 +801,6 @@ async function loadAndRender(){
         ? entries.map(e => `[${e.tag}] ${e.text}`).join('\n')
         : (entries[0] ? entries[0].text : '');
     });
-    // 월별 완료 업무 탭용: 현재 주 시트에 더 이상 없는(과거에만 있던) 업무도 포함한 전체 목록
-    monthlyCompletedGroups = Array.from(map.values());
 
     renderKpis();
     renderFilters();
