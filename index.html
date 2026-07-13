@@ -87,7 +87,7 @@
   /* task cards */
   .flow .box{border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.55;color:var(--ink);font-weight:500;white-space:pre-line;}
   .flow .box .lbl{display:block;font-size:10px;font-weight:800;color:var(--accent);letter-spacing:.03em;margin-bottom:5px;text-transform:uppercase;}
-  .flow .last{background:#eceef1;border:1px solid #dde0e5;}
+  .flow .last{background:#eef3ee;border:1px solid #d9e5da;}
   .flow .next{
     background:#e9f0fc;
     border:2px solid var(--accent);
@@ -101,10 +101,6 @@
   .flow .next .lbl::before{content:"● ";font-size:9px;}
   .flow .arrow{display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:14px;}
   .empty{color:var(--faint);font-style:italic;}
-  .remark{border-radius:10px;padding:10px 13px;font-size:12px;line-height:1.6;color:#5b5240;background:#fbf7ee;border:1px solid #ecdfc0;white-space:pre-line;}
-  .remark .lbl{display:block;font-size:10px;font-weight:800;color:var(--wait);letter-spacing:.03em;margin-bottom:4px;text-transform:uppercase;}
-  .flow .box.remark{background:#fbf7ee;border:1px solid #ecdfc0;color:#5b5240;white-space:pre-line;margin-top:0;}
-  .flow .box.remark .lbl{color:var(--wait);}
   mark{background:#fde9a8;color:inherit;border-radius:3px;padding:0 1px;}
 
   .dept-section{margin-bottom:32px;}
@@ -244,7 +240,7 @@
 <script>
 // ===== 구글 스프레드시트 연동 설정 =====
 const SHEET_ID = '1nLHE0Y6tJftFsJlU9czhd-VWG-HbXEk3ndZslar_jbQ';
-const HEADER_RANGE = 'B7:K200'; // B7:K7이 헤더, 8행부터 데이터 (I열 "이번주 업무"는 삭제되어 더 이상 존재하지 않음)
+const HEADER_RANGE = 'B7:J200'; // B7:J7이 헤더, 8행부터 데이터 (I열 "이번주 업무", 그리고 "다음주 업무" 열은 삭제되어 더 이상 존재하지 않음)
 const WEEK_LABEL_CELL = 'B1'; // 이 셀에 "2026년 7월 3주차"처럼 입력하면 자동 반영됨
 const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5분마다 자동 새로고침 (최신 주차에서만 동작)
 
@@ -253,6 +249,8 @@ const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5분마다 자동 새로고침 (최신
 // 상단 드롭다운에서 해당 주차 데이터를 그대로 불러와 볼 수 있습니다.
 // 배열의 첫 번째 항목이 "이번 주(최신)"로 취급되어 자동 새로고침이 적용됩니다.
 // gid는 구글시트 탭을 열었을 때 주소창의 '#gid=숫자' 부분에서 확인할 수 있습니다.
+// ⚠ "완료 업무"를 월 단위로 누적하기 위해 label은 반드시 "YYYY년 M월 N주차" 형식으로 시작해야 하며,
+//    같은 달의 주차들은 이 배열에서 서로 붙어 있어야 합니다(중간에 다른 달이 끼면 안 됨).
 const WEEKS = [
   { gid: '1682390790', label: '2026년 7월 3주차 (이번 주)' },
   { gid: '0', label: '2026년 7월 2주차' },
@@ -340,6 +338,65 @@ function isArchiveWeek(){
   return CURRENT_WEEK_INDEX !== 0;
 }
 
+// "2026년 7월 3주차 (이번 주)" -> "2026년 7월"
+function monthKeyOf(label){
+  const m = String(label || '').match(/^(\d{4}년\s*\d{1,2}월)/);
+  return m ? m[1] : String(label || '').trim();
+}
+
+// "2026년 7월 3주차 (이번 주)" -> "3주차"
+function weekTagOf(label){
+  const m = String(label || '').match(/(\d+주차)/);
+  return m ? m[1] : String(label || '').trim();
+}
+
+// 현재 선택된 주차와 같은 달에 속한 주차들을 [현재(최신) ... 그 달의 첫 주(과거)] 순서로 반환
+function weeksInCurrentMonth(){
+  const mKey = monthKeyOf(WEEKS[CURRENT_WEEK_INDEX].label);
+  const list = [];
+  for(let i = CURRENT_WEEK_INDEX; i < WEEKS.length; i++){
+    if(monthKeyOf(WEEKS[i].label) !== mKey) break;
+    list.push(WEEKS[i]);
+  }
+  return list;
+}
+
+// 같은 달의 이전 주차들을 모두 불러와 "완료 업무"를 업무 단위로 누적 병합한다.
+// (부서+담당자+업무명이 같으면 같은 업무로 보고 주차별 완료 내역을 이어붙임)
+async function fetchMonthlyCompleted(baseTasks){
+  const monthWeeks = weeksInCurrentMonth();      // [현재, ..., 그 달 첫 주]
+  const olderWeeks = monthWeeks.slice(1);        // 현재 주는 baseTasks로 이미 갖고 있으므로 제외
+  const chronological = olderWeeks.slice().reverse(); // 과거 -> 최신 순
+
+  const olderResults = await Promise.all(
+    chronological.map(w => fetchTasksFromSheet(w.gid).catch(()=>[]))
+  );
+
+  const map = new Map(); // key -> [{tag, text}, ...] (과거 -> 최신 순)
+  const keyOf = (t)=> `${t.dept}|||${t.owner}|||${t.title}`;
+
+  chronological.forEach((w, idx)=>{
+    const tag = weekTagOf(w.label);
+    (olderResults[idx] || []).forEach(t=>{
+      if(!t.last) return;
+      const key = keyOf(t);
+      if(!map.has(key)) map.set(key, []);
+      map.get(key).push({tag, text: t.last});
+    });
+  });
+
+  // 현재(가장 최신) 주차는 맨 마지막에 추가
+  const curTag = weekTagOf(WEEKS[CURRENT_WEEK_INDEX].label);
+  baseTasks.forEach(t=>{
+    if(!t.last) return;
+    const key = keyOf(t);
+    if(!map.has(key)) map.set(key, []);
+    map.get(key).push({tag: curTag, text: t.last});
+  });
+
+  return {map, keyOf, weekCount: monthWeeks.length};
+}
+
 async function fetchTasksFromSheet(gid){
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${gid}&range=${HEADER_RANGE}&headers=1`;
   const res = await fetch(url);
@@ -359,8 +416,9 @@ async function fetchTasksFromSheet(gid){
       const cell = c[i];
       return (cell.f !== undefined && cell.f !== null && cell.f !== '') ? cell.f : (cell.v ?? '');
     };
-    // 열 순서(I열 "이번주 업무" 삭제 후 기준): 부서, 업무구분, 담당자, 업무명, 업무 설명, 세부내용, 지난주 업무, 다음주 업무, 상태, 마감일
-    // ※ "세부내용" 열의 내용을 그대로 "이번주 업무" 박스에 반영합니다. (이번주 업무 전용 열은 더 이상 시트에 존재하지 않음)
+    // 열 순서(I열 "이번주 업무", "다음주 업무" 삭제 후 기준): 부서, 업무구분, 담당자, 업무명, 업무 설명, 세부내용, 완료 업무, 상태, 마감일
+    // ※ "세부내용" 열의 내용을 그대로 "이번주 업무" 박스에 반영합니다.
+    // ※ "완료 업무"(구 지난주 업무) 열은 loadAndRender()에서 같은 달의 다른 주차 시트와 합쳐 월 누적으로 반영됩니다.
     const dept   = String(get(0)).trim();
     const cat    = String(get(1)).trim();
     const owner  = String(get(2)).trim();
@@ -368,9 +426,8 @@ async function fetchTasksFromSheet(gid){
     const descMain   = String(get(4)).trim();
     const descDetail = String(get(5)).trim();
     const last   = String(get(6)).trim();
-    const remark = String(get(7)).trim();
-    const status = String(get(8)).trim();
-    const due    = String(get(9)).trim();
+    const status = String(get(7)).trim();
+    const due    = String(get(8)).trim();
 
     if(!title) return; // 업무명이 없는 빈 행은 건너뜀
 
@@ -382,7 +439,7 @@ async function fetchTasksFromSheet(gid){
 
     const desc = cleanText(descMain);
     const next = cleanText(descDetail); // 세부내용 → 이번주 업무로 반영
-    result.push({dept, cat, owner, title, desc, last, next, status, due, remark: cleanText(remark)});
+    result.push({dept, cat, owner, title, desc, last: cleanText(last), next, status, due});
   });
 
   return result;
@@ -622,11 +679,9 @@ function renderCardView(){
           <div class="task-body">
             ${t.desc ? `<div class="desc">${t.desc}</div>` : ""}
             <div class="flow">
-              <div class="box last"><span class="lbl">지난주 업무</span>${t.last ? t.last : '<span class="empty">지난주 업무 내용 없음</span>'}</div>
+              <div class="box last"><span class="lbl">완료 업무 (이달 누적)</span>${t.last ? t.last : '<span class="empty">이번 달 완료 업무 없음</span>'}</div>
               <div class="arrow">→</div>
               <div class="box next"><span class="lbl">이번주 업무</span>${t.next ? t.next : '<span class="empty">이번주 업무 미입력</span>'}</div>
-              <div class="arrow">→</div>
-              <div class="box remark"><span class="lbl">다음주 업무</span>${t.remark ? t.remark : '<span class="empty">다음주 업무 내용 없음</span>'}</div>
             </div>
           </div>`;
         ownerBlock.appendChild(el);
@@ -669,11 +724,9 @@ function renderSummaryView(){
       <div class="summary-card">
         <div class="summary-card-title">${highlight(t.title, term)}</div>
         <div class="flow">
-          ${box('지난주 업무', t.last, '지난주 업무 내용 없음', 'last')}
+          ${box('완료 업무 (이달 누적)', t.last, '이번 달 완료 업무 없음', 'last')}
           <div class="arrow">→</div>
           ${box('이번주 업무', t.next, '이번주 업무 미입력', 'next')}
-          <div class="arrow">→</div>
-          ${box('다음주 업무', t.remark, '다음주 업무 내용 없음', 'remark')}
         </div>
       </div>`;
 
@@ -739,6 +792,16 @@ async function loadAndRender(){
     const gid = currentGid();
     const [taskResult] = await Promise.all([fetchTasksFromSheet(gid), fetchWeekLabel(gid)]);
     tasks = taskResult;
+
+    // 완료 업무를 같은 달의 다른 주차와 합쳐 월 누적으로 반영
+    const { map, keyOf, weekCount } = await fetchMonthlyCompleted(tasks);
+    tasks.forEach(t=>{
+      const entries = map.get(keyOf(t)) || [];
+      t.last = entries.length > 1
+        ? entries.map(e => `[${e.tag}] ${e.text}`).join('\n')
+        : (entries[0] ? entries[0].text : '');
+    });
+
     renderKpis();
     renderFilters();
     renderOwnerFilters();
