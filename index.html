@@ -234,7 +234,7 @@
 <script>
 // ===== 구글 스프레드시트 연동 설정 =====
 const SHEET_ID = '1nLHE0Y6tJftFsJlU9czhd-VWG-HbXEk3ndZslar_jbQ';
-const HEADER_RANGE = 'B7:L200'; // B7:L7이 헤더, 8행부터 데이터
+const HEADER_RANGE = 'B7:K200'; // B7:K7이 헤더, 8행부터 데이터 (I열 "이번주 업무"는 삭제되어 더 이상 존재하지 않음)
 const WEEK_LABEL_CELL = 'B1'; // 이 셀에 "2026년 7월 3주차"처럼 입력하면 자동 반영됨
 const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5분마다 자동 새로고침 (최신 주차에서만 동작)
 
@@ -349,8 +349,8 @@ async function fetchTasksFromSheet(gid){
       const cell = c[i];
       return (cell.f !== undefined && cell.f !== null && cell.f !== '') ? cell.f : (cell.v ?? '');
     };
-    // 열 순서: 부서, 업무구분, 담당자, 업무명, 업무 설명, 세부내용, 지난주 업무, (이번주 업무 열은 더 이상 사용하지 않음), 다음주 업무, 상태, 마감일
-    // ※ "세부내용" 열의 내용을 그대로 "이번주 업무" 박스에 반영합니다. 시트의 "이번주 업무" 열은 읽지 않습니다.
+    // 열 순서(I열 "이번주 업무" 삭제 후 기준): 부서, 업무구분, 담당자, 업무명, 업무 설명, 세부내용, 지난주 업무, 다음주 업무, 상태, 마감일
+    // ※ "세부내용" 열의 내용을 그대로 "이번주 업무" 박스에 반영합니다. (이번주 업무 전용 열은 더 이상 시트에 존재하지 않음)
     const dept   = String(get(0)).trim();
     const cat    = String(get(1)).trim();
     const owner  = String(get(2)).trim();
@@ -358,9 +358,9 @@ async function fetchTasksFromSheet(gid){
     const descMain   = String(get(4)).trim();
     const descDetail = String(get(5)).trim();
     const last   = String(get(6)).trim();
-    const remark = String(get(8)).trim();
-    const status = String(get(9)).trim();
-    const due    = String(get(10)).trim();
+    const remark = String(get(7)).trim();
+    const status = String(get(8)).trim();
+    const due    = String(get(9)).trim();
 
     if(!title) return; // 업무명이 없는 빈 행은 건너뜀
 
