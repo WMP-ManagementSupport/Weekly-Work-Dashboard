@@ -234,6 +234,7 @@
       <select class="week-select" id="week-select" onchange="onWeekChange()"></select>
       <div class="sync-row">
         <span class="sync-time" id="sync-time"></span>
+        <a class="refresh-btn" id="sheet-link-btn" href="#" target="_blank" rel="noopener noreferrer">📊 주간업무 바로가기</a>
         <button class="refresh-btn" id="refresh-btn" onclick="manualRefresh()">↻ 새로고침</button>
       </div>
     </div>
@@ -373,7 +374,14 @@ async function discoverWeeks(){
   // 라벨을 깜빡 안 바꾼 채 지난 주 탭을 복제해 새 주차를 만드는 경우, 같은 라벨이 2개 정도 겹치는 건
   // 흔히 있는 일이라 정상으로 인정한다. 반면 진짜 "존재하지 않는 이름이 기본 탭으로 대체 응답되는" 버그는
   // 스캔 범위 안의 수많은(3개 이상) 후보가 한꺼번에 똑같은 라벨을 돌려주는 형태로 나타나므로 그 경우만 제외한다.
-  const found = hits.filter(h => !h.label || labelCount.get(h.label) < 3);
+  const found = hits.filter(h => {
+    const keep = !h.label || labelCount.get(h.label) < 3;
+    if(!keep){
+      console.warn(`[주차 탭 탐색] "${h.sheet}" 탭이 다른 탭과 라벨이 3개 이상 겹쳐서(라벨: "${h.label}") 제외되었습니다. 이 탭이 실제로 존재한다면 B1 라벨을 다른 탭과 겹치지 않게 고쳐주세요.`);
+    }
+    return keep;
+  });
+  console.log('[주차 탭 탐색] 발견된 탭:', hits.map(h => `${h.sheet} (라벨: ${h.label || '(비어있음)'})`));
 
   // 이름 기준 중복 제거 후 최신순(연/월 desc, 주차 desc) 정렬
   const byName = new Map();
@@ -440,6 +448,18 @@ setInterval(updateNowBar, 1000);
 
 // 스프레드시트의 "N월 M주" 탭 목록을 (다시) 찾아서 드롭다운을 갱신한다.
 // 이미 보고 있던 주차가 있다면 목록이 바뀌어도 화면이 그 주차에 그대로 머무르게 한다.
+// 헤더의 "주간업무 바로가기" 링크를 현재 보고 있는 주차 탭으로 연결한다.
+// gid를 아는 경우(안전망 목록)엔 그 탭으로 바로 연결하고, 이름으로만 찾은 경우엔 스프레드시트 첫 화면으로 연결한다.
+function updateSheetLink(){
+  const link = document.getElementById('sheet-link-btn');
+  if(!link) return;
+  const w = WEEKS[CURRENT_WEEK_INDEX];
+  const gid = w && w.gid !== undefined ? w.gid : null;
+  link.href = gid !== null
+    ? `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit#gid=${gid}`
+    : `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
+}
+
 async function refreshWeekList(){
   const prevKey = WEEKS[CURRENT_WEEK_INDEX]
     ? (WEEKS[CURRENT_WEEK_INDEX].sheet !== undefined ? WEEKS[CURRENT_WEEK_INDEX].sheet : WEEKS[CURRENT_WEEK_INDEX].gid)
@@ -470,6 +490,7 @@ async function refreshWeekList(){
     sel.appendChild(opt);
   });
   sel.value = String(CURRENT_WEEK_INDEX);
+  updateSheetLink();
 }
 
 // 페이지 로드 시 스프레드시트의 "N월 M주" 탭들을 자동으로 찾아 주차 목록을 구성한다.
@@ -482,6 +503,7 @@ async function initWeekSelect(){
 function onWeekChange(){
   const sel = document.getElementById('week-select');
   CURRENT_WEEK_INDEX = Number(sel.value);
+  updateSheetLink();
   // 주차를 바꾸면 검색/필터 상태는 초기화해서 혼동을 방지
   activeStatus = "전체";
   activeOwner = "전체";
