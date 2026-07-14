@@ -438,20 +438,30 @@ function updateNowBar(){
 updateNowBar();
 setInterval(updateNowBar, 1000);
 
-// 페이지 로드 시 스프레드시트의 "N월 M주" 탭들을 자동으로 찾아 주차 목록을 구성한다.
-async function initWeekSelect(){
-  const sel = document.getElementById('week-select');
-  sel.innerHTML = `<option>주차 탭 확인 중...</option>`;
+// 스프레드시트의 "N월 M주" 탭 목록을 (다시) 찾아서 드롭다운을 갱신한다.
+// 이미 보고 있던 주차가 있다면 목록이 바뀌어도 화면이 그 주차에 그대로 머무르게 한다.
+async function refreshWeekList(){
+  const prevKey = WEEKS[CURRENT_WEEK_INDEX]
+    ? (WEEKS[CURRENT_WEEK_INDEX].sheet !== undefined ? WEEKS[CURRENT_WEEK_INDEX].sheet : WEEKS[CURRENT_WEEK_INDEX].gid)
+    : null;
+
   try{
     const discovered = await discoverWeeks();
     if(discovered.length > 0){
       WEEKS = discovered;
     }
   }catch(e){
-    console.error('주차 탭 자동 탐색에 실패해 기본 목록을 사용합니다:', e);
+    console.error('주차 탭 자동 탐색에 실패해 기존 목록을 사용합니다:', e);
   }
-  CURRENT_WEEK_INDEX = 0;
 
+  let newIndex = 0;
+  if(prevKey !== null){
+    const idx = WEEKS.findIndex(w => (w.sheet !== undefined ? w.sheet : w.gid) === prevKey);
+    if(idx !== -1) newIndex = idx;
+  }
+  CURRENT_WEEK_INDEX = newIndex;
+
+  const sel = document.getElementById('week-select');
   sel.innerHTML = "";
   WEEKS.forEach((w, i)=>{
     const opt = document.createElement('option');
@@ -460,6 +470,13 @@ async function initWeekSelect(){
     sel.appendChild(opt);
   });
   sel.value = String(CURRENT_WEEK_INDEX);
+}
+
+// 페이지 로드 시 스프레드시트의 "N월 M주" 탭들을 자동으로 찾아 주차 목록을 구성한다.
+async function initWeekSelect(){
+  const sel = document.getElementById('week-select');
+  sel.innerHTML = `<option>주차 탭 확인 중...</option>`;
+  await refreshWeekList();
 }
 
 function onWeekChange(){
@@ -1188,9 +1205,13 @@ async function loadAndRender(){
   }
 
   // 자동 새로고침은 "이번 주" 탭에서만 동작 (지난 주차 아카이브는 고정된 기록이므로 갱신하지 않음)
+  // 새로 추가된 주차 탭도 자동으로 반영되도록, 갱신 주기마다 탭 목록도 함께 다시 확인한다.
   clearInterval(autoRefreshTimer);
   if(!isArchiveWeek()){
-    autoRefreshTimer = setInterval(loadAndRender, AUTO_REFRESH_MS);
+    autoRefreshTimer = setInterval(async ()=>{
+      await refreshWeekList();
+      loadAndRender();
+    }, AUTO_REFRESH_MS);
   }
 }
 
@@ -1246,7 +1267,8 @@ function updateToggleDeptBtn(){
   btn.textContent = allOpen ? '부서 전체 접기' : '부서 전체 펼치기';
 }
 
-function manualRefresh(){
+async function manualRefresh(){
+  await refreshWeekList();
   loadAndRender();
 }
 
