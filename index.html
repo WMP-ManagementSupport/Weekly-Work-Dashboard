@@ -72,7 +72,7 @@
   .kpi.overdue .num{color:var(--hold);}
 
   /* filter bar */
-  .filters-row{display:flex;flex-direction:column;gap:10px;margin-bottom:18px;}
+  .filters-row{display:flex;flex-direction:column;gap:14px;margin-bottom:18px;}
   .filter-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
   .filter-label{font-size:11.5px;color:var(--faint);font-weight:700;white-space:nowrap;min-width:38px;}
   .filters{display:flex;gap:8px;flex-wrap:wrap;flex:1;}
@@ -81,8 +81,18 @@
   .chip:hover{border-color:var(--accent);color:var(--accent);}
   .chip.active{background:var(--ink);border-color:var(--ink);color:#fff;}
   .owner-chip.active{background:var(--accent);border-color:var(--accent);}
+
+  /* 상태/담당자 필터 칩들을 하나의 패널로 묶어 아래 보기 전환 버튼과 뚜렷하게 구분 */
+  .filters-panel{background:#fafbfc;border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;}
+
+  .action-line{padding:0 2px;}
   .toggle-all-btn{font-size:12.5px;color:var(--accent);background:var(--accent-soft);border:1px solid transparent;border-radius:20px;padding:7px 14px;cursor:pointer;font-weight:600;white-space:nowrap;}
   .toggle-all-btn:hover{border-color:var(--accent);}
+  .toggle-all-btn.util-btn{color:var(--sub);background:#eef0f3;}
+  .toggle-all-btn.util-btn:hover{color:var(--accent);border-color:var(--accent);}
+  .toggle-all-btn.mode-btn{color:#fff;background:var(--accent);}
+  .toggle-all-btn.mode-btn:hover{background:#2e4568;border-color:#2e4568;}
+  .action-divider{width:1px;height:18px;background:var(--line);margin:0 2px;}
 
   /* task cards */
   .flow .box{border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.55;color:var(--ink);font-weight:500;white-space:pre-line;}
@@ -162,6 +172,31 @@
   .summary-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px 16px;}
   .summary-card-title{font-size:13.5px;font-weight:800;color:var(--ink);margin-bottom:12px;line-height:1.4;}
 
+  /* 월간 완료업무 모아보기 */
+  .monthly-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:24px;}
+  .monthly-toolbar .monthly-label{font-size:12.5px;color:var(--faint);font-weight:700;}
+  .monthly-select{font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:600;}
+  .monthly-count{font-size:12px;color:var(--sub);margin-left:auto;}
+
+  .monthly-week-section{margin-bottom:34px;}
+  .monthly-week-section:last-child{margin-bottom:0;}
+  .monthly-week-title{display:flex;align-items:baseline;gap:10px;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid var(--accent);}
+  .monthly-week-tag-lg{font-size:16px;font-weight:800;color:var(--accent);letter-spacing:-0.01em;}
+  .monthly-week-count{font-size:12px;color:var(--sub);font-weight:600;}
+
+  .monthly-dept-section{margin-bottom:20px;}
+  .monthly-dept-section:last-child{margin-bottom:0;}
+  .monthly-dept-title{font-size:13.5px;font-weight:800;color:var(--ink);margin-bottom:10px;}
+  .monthly-owner-block{margin-bottom:16px;}
+  .monthly-owner-block:last-child{margin-bottom:0;}
+  .monthly-owner-name{font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px;}
+  .monthly-item{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:8px;}
+  .monthly-item:last-child{margin-bottom:0;}
+  .monthly-item-entry{padding-bottom:13px;margin-bottom:13px;border-bottom:1px solid var(--line);}
+  .monthly-item-entry:last-child{padding-bottom:0;margin-bottom:0;border-bottom:none;}
+  .monthly-item-title{font-size:13.5px;font-weight:700;color:var(--ink);margin-bottom:6px;}
+  .monthly-item-text{font-size:13px;color:#3f4654;line-height:1.6;white-space:pre-line;}
+
 
   @media(max-width:720px){
     .kpis{grid-template-columns:repeat(3,1fr);}
@@ -220,16 +255,23 @@
   </div>
 
   <div class="filters-row">
-    <div class="filter-line">
-      <span class="filter-label">상태</span>
-      <div class="filters" id="filters"></div>
-      <button class="toggle-all-btn" id="toggle-dept-btn" onclick="toggleAllDepts()">부서 전체 접기</button>
-      <button class="toggle-all-btn" id="toggle-all-btn" onclick="toggleAll()">전체 펼치기</button>
-      <button class="toggle-all-btn" id="view-toggle-btn" onclick="toggleViewMode()">요약 보기</button>
+    <div class="filters-panel" id="filters-panel">
+      <div class="filter-line" id="status-filter-line">
+        <span class="filter-label">상태</span>
+        <div class="filters" id="filters"></div>
+      </div>
+      <div class="filter-line" id="owner-filter-line">
+        <span class="filter-label">담당자</span>
+        <div class="filters" id="owner-filters"></div>
+      </div>
     </div>
-    <div class="filter-line">
-      <span class="filter-label">담당자</span>
-      <div class="filters" id="owner-filters"></div>
+    <div class="filter-line action-line">
+      <span class="filter-label">보기</span>
+      <button class="toggle-all-btn util-btn" id="toggle-dept-btn" onclick="toggleAllDepts()">부서 전체 접기</button>
+      <button class="toggle-all-btn util-btn" id="toggle-all-btn" onclick="toggleAll()">전체 펼치기</button>
+      <span class="action-divider"></span>
+      <button class="toggle-all-btn mode-btn" id="view-toggle-btn" onclick="toggleViewMode()">요약 보기</button>
+      <button class="toggle-all-btn mode-btn" id="monthly-view-btn" onclick="toggleMonthlyView()">완료업무만 보기</button>
     </div>
   </div>
 
@@ -246,25 +288,105 @@ const HEADER_RANGE = 'B7:J200'; // B7:J7이 헤더, 8행부터 데이터 (I열 "
 const WEEK_LABEL_CELL = 'B1'; // 이 셀에 "2026년 7월 3주차"처럼 입력하면 자동 반영됨
 const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5분마다 자동 새로고침 (최신 주차에서만 동작)
 
-// ===== 지난 주차 아카이브 설정 =====
-// 스프레드시트 안에 주차별로 탭(시트)을 만들어두고, 각 탭의 gid를 아래에 추가하면
-// 상단 드롭다운에서 해당 주차 데이터를 그대로 불러와 볼 수 있습니다.
-// 배열의 첫 번째 항목이 "이번 주(최신)"로 취급되어 자동 새로고침이 적용됩니다.
-// gid는 구글시트 탭을 열었을 때 주소창의 '#gid=숫자' 부분에서 확인할 수 있습니다.
-// ⚠ "완료 업무"를 월 단위로 누적하기 위해 label은 반드시 "YYYY년 M월 N주차" 형식으로 시작해야 하며,
-//    같은 달의 주차들은 이 배열에서 서로 붙어 있어야 합니다(중간에 다른 달이 끼면 안 됨).
-const WEEKS = [
+// ===== 주차 탭 자동 탐색 설정 =====
+// 스프레드시트 안에 "N월 M주" 형식(예: "7월 1주", "8월 2주")으로 탭을 계속 만들어두면,
+// gid를 몰라도, 코드를 따로 수정하지 않아도 아래 로직이 자동으로 그 탭들을 찾아서 반영합니다.
+// ⚠ "완료 업무"를 월 단위로 누적하려면 B1 셀은 반드시 "YYYY년 M월 N주차"처럼 "N월"이 들어가게 입력해주세요.
+const MONTH_SCAN_BACK = 2;     // 과거 몇 개월까지 주차 탭을 찾아볼지
+const MONTH_SCAN_FORWARD = 4;  // 미래 몇 개월까지 미리 찾아볼지 (탭이 없으면 그냥 건너뜀 → 비용 없음)
+const MAX_WEEKS_PER_MONTH = 6; // 한 달에 최대 몇 주차까지 있을 수 있는지
+
+function weekSheetName(month, week){
+  return `${month}월 ${week}주`;
+}
+
+// 자동 탐색이 실패했을 때(네트워크 오류 등)를 대비한 최소 안전망
+const FALLBACK_WEEKS = [
   { gid: '1682390790', label: '2026년 7월 3주차 (이번 주)' },
   { gid: '0', label: '2026년 7월 2주차' },
   { gid: '1256845414', label: '2026년 7월 1주차' },
-  { gid: '1854663232', label: '2026년 6월 4주차' },
 ];
 
+let WEEKS = FALLBACK_WEEKS.slice();
 let CURRENT_WEEK_INDEX = 0;
 
-async function fetchWeekLabel(gid){
+// 시트를 gviz 쿼리로 불러올 때 쓸 파라미터. sheet 이름 기반(자동 탐색) 또는 gid 기반(안전망) 둘 다 지원
+function weekParam(w){
+  return (w && w.sheet !== undefined)
+    ? `sheet=${encodeURIComponent(w.sheet)}`
+    : `gid=${w.gid}`;
+}
+
+// 주어진 이름의 탭이 실제로 존재하는지 확인하고, 존재하면 B1(주차 라벨)까지 함께 읽어온다.
+async function probeWeekSheet(sheetName){
   try{
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${gid}&range=${WEEK_LABEL_CELL}`;
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}&range=${WEEK_LABEL_CELL}`;
+    const res = await fetch(url);
+    if(!res.ok) return null;
+    const text = await res.text();
+    const jsonStart = text.indexOf('{');
+    const jsonEnd = text.lastIndexOf('}');
+    if(jsonStart === -1 || jsonEnd === -1) return null;
+    const json = JSON.parse(text.substring(jsonStart, jsonEnd + 1));
+    if(json.status === 'error') return null; // 해당 이름의 탭이 존재하지 않음
+    const cell = json.table && json.table.rows && json.table.rows[0] && json.table.rows[0].c && json.table.rows[0].c[0];
+    const label = cell ? String(cell.v ?? '').trim() : '';
+    return { sheet: sheetName, label: label || sheetName };
+  }catch(e){
+    return null;
+  }
+}
+
+// 구글시트의 sheet= 파라미터는 이름이 존재하지 않을 때 에러 대신 엉뚱한(기본) 탭 내용을 돌려주는 경우가 있어,
+// B1 라벨이 실제로 요청한 "N월 M주"와 일치하는지 다시 한 번 검증한다. (완료업무 중복 표시 버그의 원인)
+function labelMatchesWeek(label, month, week){
+  const monthMatch = String(label || '').match(/(\d{1,2})월/);
+  const weekMatch = String(label || '').match(/(\d{1,2})주차?/);
+  if(!monthMatch || !weekMatch) return false;
+  return Number(monthMatch[1]) === month && Number(weekMatch[1]) === week;
+}
+
+// 스프레드시트 안의 "N월 M주" 탭들을 자동으로 찾아서 최신순으로 정렬한 목록을 만든다.
+async function discoverWeeks(){
+  const now = new Date();
+  const candidates = [];
+  for(let offset = -MONTH_SCAN_BACK; offset <= MONTH_SCAN_FORWARD; offset++){
+    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const sortBase = d.getFullYear() * 12 + d.getMonth(); // 연도까지 고려한 정렬 기준값
+    const month = d.getMonth() + 1;
+    for(let week = 1; week <= MAX_WEEKS_PER_MONTH; week++){
+      candidates.push({ name: weekSheetName(month, week), sortBase, month, week });
+    }
+  }
+
+  const probed = await Promise.all(candidates.map(c => probeWeekSheet(c.name)));
+
+  const found = [];
+  probed.forEach((r, i)=>{
+    if(!r) return;
+    const c = candidates[i];
+    if(!labelMatchesWeek(r.label, c.month, c.week)){
+      // 탭 이름은 매칭됐지만 B1 라벨의 월/주차가 요청한 것과 다르면
+      // 잘못된(기본) 시트를 돌려받은 것으로 보고 버린다.
+      console.warn(`"${c.name}" 탭의 라벨이 예상과 달라 건너뜁니다:`, r.label);
+      return;
+    }
+    found.push({ sheet: r.sheet, label: r.label, sortBase: c.sortBase, week: c.week });
+  });
+
+  // 이름 기준 중복 제거 후 최신순(연/월 desc, 주차 desc) 정렬
+  const byName = new Map();
+  found.forEach(f => { if(!byName.has(f.sheet)) byName.set(f.sheet, f); });
+  const list = Array.from(byName.values()).sort((a, b)=>
+    (b.sortBase - a.sortBase) || (b.week - a.week)
+  );
+
+  return list.map(({sheet, label}) => ({ sheet, label }));
+}
+
+async function fetchWeekLabel(w){
+  try{
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&${weekParam(w)}&range=${WEEK_LABEL_CELL}`;
     const res = await fetch(url);
     const text = await res.text();
     const jsonStart = text.indexOf('{');
@@ -289,6 +411,11 @@ let searchText = "";
 let searchDebounceTimer = null;
 let collapsedDepts = new Set();
 
+// ===== 월간 완료업무 모아보기 =====
+let monthlyViewActive = false;
+let selectedMonthKey = null; // 예: '2026년 7월'
+const monthlyEntriesCache = new Map(); // monthKey -> Promise<entries[]>
+
 function updateNowBar(){
   const now = new Date();
   const weekdays = ['일','월','화','수','목','금','토'];
@@ -307,8 +434,20 @@ function updateNowBar(){
 updateNowBar();
 setInterval(updateNowBar, 1000);
 
-function initWeekSelect(){
+// 페이지 로드 시 스프레드시트의 "N월 M주" 탭들을 자동으로 찾아 주차 목록을 구성한다.
+async function initWeekSelect(){
   const sel = document.getElementById('week-select');
+  sel.innerHTML = `<option>주차 탭 확인 중...</option>`;
+  try{
+    const discovered = await discoverWeeks();
+    if(discovered.length > 0){
+      WEEKS = discovered;
+    }
+  }catch(e){
+    console.error('주차 탭 자동 탐색에 실패해 기본 목록을 사용합니다:', e);
+  }
+  CURRENT_WEEK_INDEX = 0;
+
   sel.innerHTML = "";
   WEEKS.forEach((w, i)=>{
     const opt = document.createElement('option');
@@ -332,8 +471,8 @@ function onWeekChange(){
   loadAndRender();
 }
 
-function currentGid(){
-  return WEEKS[CURRENT_WEEK_INDEX].gid;
+function currentWeek(){
+  return WEEKS[CURRENT_WEEK_INDEX];
 }
 
 function isArchiveWeek(){
@@ -355,12 +494,7 @@ function weekTagOf(label){
 // 현재 선택된 주차와 같은 달에 속한 주차들을 [현재(최신) ... 그 달의 첫 주(과거)] 순서로 반환
 function weeksInCurrentMonth(){
   const mKey = monthKeyOf(WEEKS[CURRENT_WEEK_INDEX].label);
-  const list = [];
-  for(let i = CURRENT_WEEK_INDEX; i < WEEKS.length; i++){
-    if(monthKeyOf(WEEKS[i].label) !== mKey) break;
-    list.push(WEEKS[i]);
-  }
-  return list;
+  return WEEKS.filter(w => monthKeyOf(w.label) === mKey);
 }
 
 // 같은 달의 이전 주차들을 모두 불러와 "완료 업무"를 업무 단위로 누적 병합한다.
@@ -371,19 +505,24 @@ async function fetchMonthlyCompleted(baseTasks){
   const chronological = olderWeeks.slice().reverse(); // 과거 -> 최신 순
 
   const olderResults = await Promise.all(
-    chronological.map(w => fetchTasksFromSheet(w.gid).catch(()=>[]))
+    chronological.map(w => fetchTasksFromSheet(w).catch(()=>[]))
   );
 
   const map = new Map(); // key -> [{tag, text}, ...] (과거 -> 최신 순)
   const keyOf = (t)=> `${t.dept}|||${t.owner}|||${t.title}`;
+  const pushEntry = (key, tag, text)=>{
+    if(!map.has(key)) map.set(key, []);
+    const list = map.get(key);
+    // 같은 주차·같은 내용이 이미 들어있다면 중복 추가하지 않음 (탭 중복 탐색 등에 대비한 안전장치)
+    if(list.some(e => e.tag === tag && e.text === text)) return;
+    list.push({tag, text});
+  };
 
   chronological.forEach((w, idx)=>{
     const tag = weekTagOf(w.label);
     (olderResults[idx] || []).forEach(t=>{
       if(!t.last) return;
-      const key = keyOf(t);
-      if(!map.has(key)) map.set(key, []);
-      map.get(key).push({tag, text: t.last});
+      pushEntry(keyOf(t), tag, t.last);
     });
   });
 
@@ -391,16 +530,14 @@ async function fetchMonthlyCompleted(baseTasks){
   const curTag = weekTagOf(WEEKS[CURRENT_WEEK_INDEX].label);
   baseTasks.forEach(t=>{
     if(!t.last) return;
-    const key = keyOf(t);
-    if(!map.has(key)) map.set(key, []);
-    map.get(key).push({tag: curTag, text: t.last});
+    pushEntry(keyOf(t), curTag, t.last);
   });
 
   return {map, keyOf, weekCount: monthWeeks.length};
 }
 
-async function fetchTasksFromSheet(gid){
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${gid}&range=${HEADER_RANGE}&headers=1`;
+async function fetchTasksFromSheet(w){
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&${weekParam(w)}&range=${HEADER_RANGE}&headers=1`;
   const res = await fetch(url);
   if(!res.ok) throw new Error('스프레드시트 응답 오류 (' + res.status + ')');
   const text = await res.text();
@@ -572,7 +709,7 @@ function onSearchInput(){
   clearTimeout(searchDebounceTimer);
   searchDebounceTimer = setTimeout(()=>{
     searchText = val.trim();
-    renderList();
+    if(monthlyViewActive){ renderMonthlyView(); } else { renderList(); }
   }, 150);
 }
 
@@ -582,7 +719,7 @@ function clearSearch(){
   searchText = "";
   document.getElementById('search-clear').classList.remove('show');
   input.focus();
-  renderList();
+  if(monthlyViewActive){ renderMonthlyView(); } else { renderList(); }
 }
 
 function getFilteredTasks(){
@@ -775,6 +912,211 @@ function renderSummaryView(){
   list.innerHTML = sections.join('');
 }
 
+// ===== 월간 완료업무 모아보기 =====
+
+// 발견된 주차들 중에서 서로 다른 "달"만 최신순으로 추려낸다.
+function availableMonths(){
+  const seen = new Set();
+  const months = [];
+  WEEKS.forEach(w=>{
+    const mk = monthKeyOf(w.label);
+    if(mk && !seen.has(mk)){ seen.add(mk); months.push(mk); }
+  });
+  return months;
+}
+
+function weeksOfMonth(monthKey){
+  return WEEKS.filter(w => monthKeyOf(w.label) === monthKey);
+}
+
+// 특정 달에 속한 모든 주차 탭을 불러와 H열(완료 업무)이 채워진 항목을 모두 모은다.
+// (같은 업무라도 병합하지 않고, 주차별로 있는 그대로 나열함)
+function getMonthlyCompletedEntries(monthKey){
+  if(monthlyEntriesCache.has(monthKey)) return monthlyEntriesCache.get(monthKey);
+
+  const weeks = weeksOfMonth(monthKey); // 최신 주 -> 과거 주 순
+  const promise = Promise.all(
+    weeks.map(w => fetchTasksFromSheet(w).catch(()=>[]).then(list => ({ w, list })))
+  ).then(results=>{
+    const entries = [];
+    results.forEach(({w, list})=>{
+      const tag = weekTagOf(w.label);
+      list.forEach(t=>{
+        if(!t.last) return;
+        entries.push({
+          dept: t.dept || '기타',
+          owner: t.owner || '미지정',
+          cat: t.cat,
+          title: t.title,
+          text: t.last,
+          weekTag: tag
+        });
+      });
+    });
+    return entries;
+  });
+
+  monthlyEntriesCache.set(monthKey, promise);
+  return promise;
+}
+
+async function renderMonthlyView(){
+  const list = document.getElementById('list');
+  const months = availableMonths();
+
+  if(months.length === 0){
+    list.innerHTML = `<div class="state-msg">불러올 수 있는 달이 없습니다.</div>`;
+    return;
+  }
+  if(!selectedMonthKey || !months.includes(selectedMonthKey)){
+    selectedMonthKey = months[0];
+  }
+
+  const loadingMonthKey = selectedMonthKey;
+  list.innerHTML = `<div class="state-msg">${selectedMonthKey} 완료 업무를 불러오는 중...</div>`;
+
+  let entries;
+  try{
+    entries = await getMonthlyCompletedEntries(selectedMonthKey);
+  }catch(err){
+    list.innerHTML = `<div class="state-msg error">완료 업무를 불러오지 못했습니다.<br><small>${err.message}</small></div>`;
+    console.error(err);
+    return;
+  }
+
+  // 불러오는 동안 다른 달로 바꿨거나 화면을 벗어났다면 그리지 않음
+  if(!monthlyViewActive || selectedMonthKey !== loadingMonthKey) return;
+
+  const term = searchText;
+  const filtered = term
+    ? entries.filter(e =>
+        e.title.toLowerCase().includes(term.toLowerCase()) ||
+        (e.owner||'').toLowerCase().includes(term.toLowerCase()))
+    : entries;
+
+  const toolbar = `
+    <div class="monthly-toolbar">
+      <span class="monthly-label">보기 기준 달</span>
+      <select class="monthly-select" id="monthly-month-select" onchange="onMonthlyMonthChange()"></select>
+      <span class="monthly-count">${filtered.length}건</span>
+    </div>`;
+
+  if(filtered.length === 0){
+    list.innerHTML = toolbar + `<div class="state-msg">${term ? '검색 결과가 없습니다.' : '이 달에 등록된 완료 업무가 없습니다.'}</div>`;
+    populateMonthlySelect(months);
+    return;
+  }
+
+  // 주차별로 먼저 그룹화(엔트리는 이미 최신 주 -> 과거 주 순으로 들어와 있음)
+  const weekGroups = new Map();
+  filtered.forEach(e=>{
+    if(!weekGroups.has(e.weekTag)) weekGroups.set(e.weekTag, []);
+    weekGroups.get(e.weekTag).push(e);
+  });
+
+  const sections = Array.from(weekGroups.entries()).map(([weekTag, weekItems])=>{
+    const deptGroups = new Map();
+    weekItems.forEach(e=>{
+      if(!deptGroups.has(e.dept)) deptGroups.set(e.dept, []);
+      deptGroups.get(e.dept).push(e);
+    });
+    const deptKeys = sortedDeptKeys(deptGroups);
+
+    const deptSections = deptKeys.map(deptKey=>{
+      const items = deptGroups.get(deptKey);
+      const ownerGroups = new Map();
+      items.forEach(e=>{
+        if(!ownerGroups.has(e.owner)) ownerGroups.set(e.owner, []);
+        ownerGroups.get(e.owner).push(e);
+      });
+
+      const ownerBlocks = Array.from(ownerGroups.entries()).map(([ownerName, ownerItems])=>`
+          <div class="monthly-owner-block">
+            <div class="monthly-owner-name">${highlight(ownerName, term)} <span style="color:var(--faint);font-weight:600;">(${ownerItems.length}건)</span></div>
+            <div class="monthly-item">
+              ${ownerItems.map(e=>`
+                <div class="monthly-item-entry">
+                  <div class="monthly-item-title">${highlight(e.title, term)}</div>
+                  <div class="monthly-item-text">${linkify(highlight(e.text, term))}</div>
+                </div>`).join('')}
+            </div>
+          </div>`).join('');
+
+      return `
+        <div class="monthly-dept-section">
+          <div class="monthly-dept-title">${deptKey} <span style="color:var(--sub);font-weight:600;font-size:12px;">${items.length}건</span></div>
+          ${ownerBlocks}
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="monthly-week-section">
+        <div class="monthly-week-title">
+          <span class="monthly-week-tag-lg">${weekTag}</span>
+          <span class="monthly-week-count">${weekItems.length}건</span>
+        </div>
+        ${deptSections}
+      </div>`;
+  }).join('');
+
+
+  list.innerHTML = toolbar + sections;
+  populateMonthlySelect(months);
+}
+
+function populateMonthlySelect(months){
+  const sel = document.getElementById('monthly-month-select');
+  if(!sel) return;
+  sel.innerHTML = "";
+  months.forEach(mk=>{
+    const opt = document.createElement('option');
+    opt.value = mk;
+    opt.textContent = mk;
+    sel.appendChild(opt);
+  });
+  sel.value = selectedMonthKey;
+}
+
+function onMonthlyMonthChange(){
+  const sel = document.getElementById('monthly-month-select');
+  if(!sel) return;
+  selectedMonthKey = sel.value;
+  renderMonthlyView();
+}
+
+function toggleMonthlyView(){
+  monthlyViewActive = !monthlyViewActive;
+  updateMonthlyViewBtn();
+  toggleUIForMonthlyView();
+  if(monthlyViewActive){
+    renderMonthlyView();
+  }else{
+    renderList();
+  }
+}
+
+function updateMonthlyViewBtn(){
+  const btn = document.getElementById('monthly-view-btn');
+  if(!btn) return;
+  btn.textContent = monthlyViewActive ? '← 업무 목록으로' : '완료업무만 보기';
+}
+
+// 월간 완료업무 보기에서는 주차별 상태/담당자 필터, 부서 펼치기 관련 버튼이 의미가 없으므로 숨기고
+// 화면 전환용 버튼(요약 보기/완료업무만 보기)이 있는 줄은 계속 보이게 둔다.
+function toggleUIForMonthlyView(){
+  const panel = document.getElementById('filters-panel');
+  if(panel) panel.style.display = monthlyViewActive ? 'none' : '';
+
+  const hideWhileMonthly = ['toggle-dept-btn', 'toggle-all-btn', 'view-toggle-btn'];
+  hideWhileMonthly.forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.style.display = monthlyViewActive ? 'none' : '';
+  });
+  document.querySelectorAll('.action-divider').forEach(el=>{
+    el.style.display = monthlyViewActive ? 'none' : '';
+  });
+}
+
 function toggleViewMode(){
   viewMode = viewMode === 'summary' ? 'card' : 'summary';
   updateViewToggleBtn();
@@ -809,12 +1151,12 @@ async function loadAndRender(){
   btn.disabled = true;
   document.getElementById('archive-badge').classList.toggle('show', isArchiveWeek());
   try{
-    const gid = currentGid();
-    const [taskResult] = await Promise.all([fetchTasksFromSheet(gid), fetchWeekLabel(gid)]);
+    const w = currentWeek();
+    const [taskResult] = await Promise.all([fetchTasksFromSheet(w), fetchWeekLabel(w)]);
     tasks = taskResult;
 
     // 완료 업무를 같은 달의 다른 주차와 합쳐 월 누적으로 반영
-    const { map, keyOf, weekCount } = await fetchMonthlyCompleted(tasks);
+    const { map, keyOf } = await fetchMonthlyCompleted(tasks);
     tasks.forEach(t=>{
       const entries = map.get(keyOf(t)) || [];
       t.last = entries.length > 1
@@ -822,14 +1164,23 @@ async function loadAndRender(){
         : (entries[0] ? entries[0].text : '');
     });
 
+    // 새로고침할 때마다 월간 완료업무 캐시도 갱신되도록 비워준다
+    monthlyEntriesCache.clear();
+
     renderKpis();
     renderFilters();
     renderOwnerFilters();
-    renderList();
+    if(monthlyViewActive){
+      renderMonthlyView();
+    }else{
+      renderList();
+    }
     updateSyncTime();
   }catch(err){
-    document.getElementById('list').innerHTML =
-      `<div class="state-msg error">데이터를 불러오지 못했습니다.<br>스프레드시트 공유 설정("링크가 있는 모든 사용자" 뷰어)을 확인해 주세요.<br><small>${err.message}</small></div>`;
+    if(!monthlyViewActive){
+      document.getElementById('list').innerHTML =
+        `<div class="state-msg error">데이터를 불러오지 못했습니다.<br>스프레드시트 공유 설정("링크가 있는 모든 사용자" 뷰어)을 확인해 주세요.<br><small>${err.message}</small></div>`;
+    }
     console.error(err);
   }finally{
     btn.disabled = false;
@@ -913,8 +1264,10 @@ document.getElementById('list').addEventListener('toggle', (e)=>{
   }
 }, true);
 
-initWeekSelect();
-loadAndRender();
+(async function start(){
+  await initWeekSelect();
+  await loadAndRender();
+})();
 </script>
 </body>
 </html>
