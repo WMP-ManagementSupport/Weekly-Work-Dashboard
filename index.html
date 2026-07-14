@@ -155,7 +155,6 @@
   .status.보류{color:var(--hold);background:#fbecec;}
 
   .task-body{padding:0 16px 16px;}
-  .desc{font-size:14px;color:#3f4654;font-weight:500;margin:0 0 14px;line-height:1.7;white-space:pre-line;padding:12px 14px;background:#fafbfc;border-left:3px solid var(--accent);border-radius:0 8px 8px 0;}
 
   .state-msg{text-align:center;color:var(--sub);font-size:13px;padding:60px 0;}
   .state-msg.error{color:var(--hold);}
@@ -284,7 +283,7 @@
 <script>
 // ===== 구글 스프레드시트 연동 설정 =====
 const SHEET_ID = '1nLHE0Y6tJftFsJlU9czhd-VWG-HbXEk3ndZslar_jbQ';
-const HEADER_RANGE = 'B7:J200'; // B7:J7이 헤더, 8행부터 데이터 (I열 "이번주 업무", 그리고 "다음주 업무" 열은 삭제되어 더 이상 존재하지 않음)
+const HEADER_RANGE = 'B7:I200'; // B7:I7이 헤더, 8행부터 데이터 ("업무 설명" 열 삭제 후 기준. I열 "다음주 업무" 열은 이전에 이미 삭제됨)
 const WEEK_LABEL_CELL = 'B1'; // 이 셀에 "2026년 7월 3주차"처럼 입력하면 자동 반영됨
 const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5분마다 자동 새로고침 (최신 주차에서만 동작)
 
@@ -555,18 +554,17 @@ async function fetchTasksFromSheet(w){
       const cell = c[i];
       return (cell.f !== undefined && cell.f !== null && cell.f !== '') ? cell.f : (cell.v ?? '');
     };
-    // 열 순서(I열 "이번주 업무", "다음주 업무" 삭제 후 기준): 부서, 업무구분, 담당자, 업무명, 업무 설명, 세부내용, 완료 업무, 상태, 마감일
+    // 열 순서("업무 설명" 열 삭제 후 기준): 부서, 업무구분, 담당자, 업무명, 세부내용, 완료 업무, 상태, 마감일
     // ※ "세부내용" 열의 내용을 그대로 "이번주 업무" 박스에 반영합니다.
     // ※ "완료 업무"(구 지난주 업무) 열은 loadAndRender()에서 같은 달의 다른 주차 시트와 합쳐 월 누적으로 반영됩니다.
     const dept   = String(get(0)).trim();
     const cat    = String(get(1)).trim();
     const owner  = String(get(2)).trim();
     const title  = String(get(3)).trim();
-    const descMain   = String(get(4)).trim();
-    const descDetail = String(get(5)).trim();
-    const last   = String(get(6)).trim();
-    const status = String(get(7)).trim();
-    const due    = String(get(8)).trim();
+    const detail = String(get(4)).trim();
+    const last   = String(get(5)).trim();
+    const status = String(get(6)).trim();
+    const due    = String(get(7)).trim();
 
     if(!title) return; // 업무명이 없는 빈 행은 건너뜀
 
@@ -576,9 +574,8 @@ async function fetchTasksFromSheet(w){
       .filter(line => line.length > 0)
       .join('\n');
 
-    const desc = cleanText(descMain);
-    const next = cleanText(descDetail); // 세부내용 → 이번주 업무로 반영
-    result.push({dept, cat, owner, title, desc, last: cleanText(last), next, status, due});
+    const next = cleanText(detail); // 세부내용 → 이번주 업무로 반영
+    result.push({dept, cat, owner, title, last: cleanText(last), next, status, due});
   });
 
   return result;
@@ -834,7 +831,6 @@ function renderCardView(){
             </div>
           </summary>
           <div class="task-body">
-            ${t.desc ? `<div class="desc">${linkify(t.desc)}</div>` : ""}
             <div class="flow">
               <div class="box last"><span class="lbl">완료 업무</span>${t.last ? linkify(t.last) : '<span class="empty">이번 달 완료 업무 없음</span>'}</div>
               <div class="arrow">→</div>
