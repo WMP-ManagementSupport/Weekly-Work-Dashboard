@@ -647,7 +647,7 @@ function highlight(text, term){
 // 텍스트 안의 URL(http/https, www.)을 자동으로 감지해서 클릭 가능한 링크로 변환
 function linkify(text){
   if(!text) return text;
-  const urlRe = /(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+)/g;
+  const urlRe = /(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+|\b(?:[a-zA-Z0-9-]+\.)+(?:com|net|org|co|io|me|kr|gle|ly|app|dev|link|site|new|page)(?:\.[a-zA-Z]{2,3})?\/[^\s<>"']*)/g;
   return text.replace(urlRe, (match)=>{
     // 문장 끝에 자주 붙는 문장부호/괄호는 링크 밖으로 빼줌
     let trail = '';
