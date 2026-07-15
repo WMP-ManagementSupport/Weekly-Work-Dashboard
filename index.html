@@ -544,35 +544,42 @@ async function fetchMonthlyCompleted(baseTasks){
   return {map, keyOf, weekCount: monthWeeks.length};
 }
 
+// Sheets API v4로 셀의 "보이는 값"과 "실제 걸린 링크 주소"를 함께 읽어온다.
+// values.get과 달리 이 방식(includeGridData)은 =HYPERLINK() 수식뿐 아니라
+// "삽입 > 링크"로 건 링크(서식 기반)까지 읽을 수 있다. (단, 한 셀에 서로 다른 링크가
+// 여러 개 섞여 있으면 구글 쪽에서 이 필드를 비워버려 그 경우까지는 못 읽는다)
+async function fetchGridWithLinks(sheetTitle, range){
+  const a1 = `${quoteSheetName(sheetTitle)}!${range}`;
+  const fields = encodeURIComponent('sheets.data.rowData.values(formattedValue,hyperlink)');
+  const url = `${SHEETS_API_BASE}/${SHEET_ID}?ranges=${encodeURIComponent(a1)}&includeGridData=true&fields=${fields}&key=${API_KEY}`;
+  const res = await fetch(url);
+  if(!res.ok){
+    const body = await res.text().catch(()=> '');
+    throw new Error(`Sheets API 오류 (${res.status}): ${body.slice(0, 200)}`);
+  }
+  const json = await res.json();
+  const rowData = (json.sheets && json.sheets[0] && json.sheets[0].data && json.sheets[0].data[0] && json.sheets[0].data[0].rowData) || [];
+  return rowData.map(r => (r.values || []).map(c => ({
+    text: (c && c.formattedValue) || '',
+    href: (c && c.hyperlink) || null,
+  })));
+}
+
 async function fetchTasksFromSheet(w){
-  // 화면에 보이는 값(FORMATTED_VALUE)과 수식 원문(FORMULA)을 함께 받아서,
-  // =HYPERLINK("주소","라벨") 형태인 셀은 실제 링크로 살려서 보여준다.
-  const [formatted, formulas] = await Promise.all([
-    fetchRangeValues(w.sheet, HEADER_RANGE, 'FORMATTED_VALUE'),
-    fetchRangeValues(w.sheet, HEADER_RANGE, 'FORMULA'),
-  ]);
+  const grid = await fetchGridWithLinks(w.sheet, HEADER_RANGE);
 
   // HEADER_RANGE는 B7부터라 첫 행(index 0)이 헤더(7행), 그 다음부터가 실제 데이터(8행~)
-  const dataRows = formatted.slice(1);
-  const dataFormulaRows = formulas.slice(1);
+  const dataRows = grid.slice(1);
   const result = [];
 
-  const hyperlinkRe = /^=HYPERLINK\(\s*"((?:[^"\\]|\\.)*)"\s*(?:,\s*"((?:[^"\\]|\\.)*)")?\s*\)\s*$/i;
-
-  dataRows.forEach((row, i)=>{
-    const rawRow = dataFormulaRows[i] || [];
+  dataRows.forEach(row=>{
     const get = (idx)=>{
-      const raw = rawRow[idx];
-      if(typeof raw === 'string' && raw.trim().startsWith('=')){
-        const m = raw.trim().match(hyperlinkRe);
-        if(m){
-          const url = m[1];
-          const label = (m[2] !== undefined && m[2] !== '') ? m[2] : url;
-          return `{{LINK|${label}|${url}}}`; // linkify()에서 실제 <a> 태그로 변환됨
-        }
+      const cell = row[idx];
+      if(!cell) return '';
+      if(cell.href){
+        return `{{LINK|${cell.text || cell.href}|${cell.href}}}`; // linkify()에서 실제 <a> 태그로 변환됨
       }
-      const v = row[idx];
-      return v !== undefined && v !== null ? v : '';
+      return cell.text;
     };
     // 열 순서("업무 설명" 열 삭제 후 기준): 부서, 업무구분, 담당자, 업무명, 세부내용, 완료 업무, 상태, 마감일
     // ※ "세부내용" 열의 내용을 그대로 "이번주 업무" 박스에 반영합니다.
