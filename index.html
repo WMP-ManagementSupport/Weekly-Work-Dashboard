@@ -699,29 +699,28 @@ function highlight(text, term){
 // 텍스트 안의 URL(http/https, www.)을 자동으로 감지해서 클릭 가능한 링크로 변환
 function linkify(text){
   if(!text) return text;
-  const urlRe = /(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+|\b(?:[a-zA-Z0-9-]+\.)+(?:com|net|org|co|io|me|kr|gle|ly|app|dev|link|site|new|page)(?:\.[a-zA-Z]{2,3})?\/[^\s<>"']*)/g;
-  let out = text.replace(urlRe, (match)=>{
-    // 문장 끝에 자주 붙는 문장부호/괄호는 링크 밖으로 빼줌
+  // {{LINK|라벨|주소}} 마커(=HYPERLINK 수식에서 옴)와 일반 URL을 한 번의 replace로 같이 처리한다.
+  // 두 번에 나눠 처리하면, 먼저 만들어진 <a href="주소">의 "주소" 부분이 두 번째 패스에서
+  // 다시 URL로 인식되어 링크 안에 링크가 중첩되는 문제가 있어 한 번에 처리해야 한다.
+  const combinedRe = /\{\{LINK\|([^{}]*)\|([^{}]*)\}\}|(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+|\b(?:[a-zA-Z0-9-]+\.)+(?:com|net|org|co|io|me|kr|gle|ly|app|dev|link|site|new|page)(?:\.[a-zA-Z]{2,3})?\/[^\s<>"']*)/g;
+
+  return text.replace(combinedRe, (whole, sentLabel, sentUrl, rawUrl)=>{
+    if(sentUrl !== undefined){
+      const safeLabel = sentLabel || sentUrl;
+      return `<a href="${sentUrl}" target="_blank" rel="noopener noreferrer" class="cell-link" onclick="event.stopPropagation()">${safeLabel}</a>`;
+    }
+    // 일반 URL: 문장 끝에 자주 붙는 문장부호/괄호는 링크 밖으로 빼줌
+    let match = rawUrl;
     let trail = '';
     const m = match.match(/[.,)\]}!?;:'"]+$/);
     if(m){
       trail = m[0];
       match = match.slice(0, -trail.length);
     }
-    if(!match) return match + trail;
+    if(!match) return whole;
     const href = /^https?:\/\//i.test(match) ? match : ('https://' + match);
     return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="cell-link" onclick="event.stopPropagation()">${match}</a>${trail}`;
   });
-
-  // =HYPERLINK("주소","라벨") 수식에서 뽑아낸 링크 마커를 실제 <a> 태그로 변환 (일반 URL 치환 뒤에 처리해서
-  // href 안의 주소가 다시 링크로 잡히는 걸 방지)
-  const linkSentinelRe = /\{\{LINK\|([^{}]*)\|([^{}]*)\}\}/g;
-  out = out.replace(linkSentinelRe, (_, label, url)=>{
-    const safeLabel = label || url;
-    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="cell-link" onclick="event.stopPropagation()">${safeLabel}</a>`;
-  });
-
-  return out;
 }
 
 function matchesSearch(t, term){
