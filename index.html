@@ -282,64 +282,92 @@
 </div>
 
 <script>
-// ===== 구글 스프레드시트 연동 설정 =====
+// ===== 구글 스프레드시트 연동 설정 (Sheets API v4) =====
 const SHEET_ID = '1nLHE0Y6tJftFsJlU9czhd-VWG-HbXEk3ndZslar_jbQ';
-const HEADER_RANGE = 'B7:I200'; // B7:I7이 헤더, 8행부터 데이터 ("업무 설명" 열 삭제 후 기준. I열 "다음주 업무" 열은 이전에 이미 삭제됨)
-const WEEK_LABEL_CELL = 'B1'; // 이 셀에 "2026년 7월 3주차"처럼 입력하면 자동 반영됨
+const API_KEY = 'AIzaSyBSuBKOLmMvr2hR6UIQKMFg6mJ6Seq0hz8'; // 읽기 전용, Sheets API로 제한된 키
+const SHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
+const HEADER_RANGE = 'B7:I200'; // 8행부터 데이터 (7행은 헤더)
+const WEEK_LABEL_CELL = 'B1';   // 이 셀에 "2026년 7월 3주차"처럼 입력하면 자동 반영됨
 const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5분마다 자동 새로고침 (최신 주차에서만 동작)
 
-// ===== 주차 탭 등록 =====
-// 구글시트의 "sheet=이름" 조회 방식은 존재하지 않는 이름을 요청해도 에러 대신 다른 탭 내용을
-// 그대로 대신 돌려주는 경우가 있어(이 스프레드시트에서 실제로 확인됨), 이름만으로 자동 탐색하는 건
-// 신뢰할 수 없었습니다. 대신 gid(탭을 열었을 때 주소창의 '#gid=숫자' 부분) 방식은 이런 문제가 없어서
-// 안정적입니다. 새 주차 탭을 만들 때마다 아래 배열에 { gid: '탭의 gid', label: '2026년 M월 N주차' }
-// 한 줄만 추가해 주세요. (배열 순서는 상관없이 아래에서 최신순으로 자동 정렬됩니다)
-const WEEKS_CONFIG = [
-  { gid: '1727563786', label: '2026년 7월 3주차' },
-  { gid: '0',           label: '2026년 7월 2주차' },
-  { gid: '1256845414', label: '2026년 7월 1주차' },
-  { gid: '1813473838', label: '2026년 6월 5주차' },
-  { gid: '336919514',  label: '2026년 6월 4주차' },
+// 혹시 API 호출이 실패할 때(키 문제, 네트워크 오류 등) 쓸 최소 안전망
+const FALLBACK_WEEKS = [
+  { gid: '369750653',  sheet: '7월 4주', label: '2026년 7월 4주차' },
+  { gid: '1727563786', sheet: '7월 3주', label: '2026년 7월 3주차' },
+  { gid: '0',           sheet: '7월 2주', label: '2026년 7월 2주차' },
+  { gid: '1256845414', sheet: '7월 1주', label: '2026년 7월 1주차' },
 ];
 
-// 라벨("2026년 7월 3주차")에서 연/월/주차 숫자를 뽑아 정렬·월별 그룹핑에 사용한다.
-function parseWeekLabel(label){
-  const yM = String(label || '').match(/(\d{4})년\s*(\d{1,2})월/);
-  const wM = String(label || '').match(/(\d{1,2})주차?/);
-  return {
-    year: yM ? Number(yM[1]) : 0,
-    month: yM ? Number(yM[2]) : 0,
-    week: wM ? Number(wM[1]) : 0,
-  };
-}
-
-function buildWeeksFromConfig(){
-  const list = WEEKS_CONFIG.map(w => {
-    const { year, month, week } = parseWeekLabel(w.label);
-    const sortBase = year * 12 + (month - 1);
-    return { gid: w.gid, label: w.label, year, month, week, sortBase };
-  });
-  list.sort((a, b) => (b.sortBase - a.sortBase) || (b.week - a.week));
-  return list;
-}
-
-let WEEKS = buildWeeksFromConfig();
+let WEEKS = [];
 let CURRENT_WEEK_INDEX = 0;
 
-function weekParam(w){
-  return `gid=${w.gid}`;
+// 시트 이름을 A1 range 문자열에 안전하게 넣기 위한 이스케이프 (작은따옴표 두 번으로 이스케이프)
+function quoteSheetName(name){
+  return `'${String(name).replace(/'/g, "''")}'`;
+}
+
+// Sheets API v4로 특정 시트의 특정 범위를 읽어온다. renderOption: 'FORMATTED_VALUE'(화면에 보이는 값) 또는 'FORMULA'(수식 원문, HYPERLINK 감지용)
+async function fetchRangeValues(sheetTitle, range, renderOption){
+  const a1 = `${quoteSheetName(sheetTitle)}!${range}`;
+  const url = `${SHEETS_API_BASE}/${SHEET_ID}/values/${encodeURIComponent(a1)}?key=${API_KEY}&valueRenderOption=${renderOption}`;
+  const res = await fetch(url);
+  if(!res.ok){
+    const body = await res.text().catch(()=> '');
+    throw new Error(`Sheets API 오류 (${res.status}): ${body.slice(0, 200)}`);
+  }
+  const json = await res.json();
+  return json.values || [];
+}
+
+// 스프레드시트에 실제로 존재하는 모든 탭 목록(이름 + 진짜 gid)을 정식 API로 조회한다.
+// gviz의 "이름으로 추측해서 요청" 방식과 달리, 이건 구글이 직접 알려주는 정확한 목록이라 헷갈릴 일이 없다.
+async function fetchAllSheetTabs(){
+  const url = `${SHEETS_API_BASE}/${SHEET_ID}?key=${API_KEY}&fields=sheets.properties`;
+  const res = await fetch(url);
+  if(!res.ok){
+    const body = await res.text().catch(()=> '');
+    throw new Error(`탭 목록 조회 실패 (${res.status}): ${body.slice(0, 200)}`);
+  }
+  const json = await res.json();
+  return (json.sheets || []).map(s => ({
+    gid: String(s.properties.sheetId),
+    title: s.properties.title,
+  }));
+}
+
+// 탭 이름("7월 4주")에서 월/주차를 뽑아, "N월 M주" 형식인 탭들만 주차 목록으로 구성한다.
+async function discoverWeeks(){
+  const tabs = await fetchAllSheetTabs();
+  const weekRe = /^(\d{1,2})\s*월\s*(\d{1,2})\s*주$/;
+  const now = new Date();
+
+  const weeks = [];
+  tabs.forEach(tab => {
+    const m = tab.title.trim().match(weekRe);
+    if(!m) return;
+    const month = Number(m[1]);
+    const week = Number(m[2]);
+    // 탭 이름엔 연도가 없어서, 현재 실제 날짜를 기준으로 자연스러운 연도를 추정한다.
+    // (지금이 1~2월인데 탭이 11~12월이면 작년 것으로, 반대의 경우 내년 것으로 취급)
+    let year = now.getFullYear();
+    const curMonth = now.getMonth() + 1;
+    if(curMonth <= 2 && month >= 11) year -= 1;
+    if(curMonth >= 11 && month <= 2) year += 1;
+    const sortBase = year * 12 + (month - 1);
+    weeks.push({ gid: tab.gid, sheet: tab.title, year, month, week, sortBase });
+  });
+
+  weeks.sort((a, b) => (b.sortBase - a.sortBase) || (b.week - a.week));
+  return weeks.map(w => ({
+    gid: w.gid, sheet: w.sheet, year: w.year, month: w.month, week: w.week,
+    label: `${w.year}년 ${w.month}월 ${w.week}주차`
+  }));
 }
 
 async function fetchWeekLabel(w){
   try{
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&${weekParam(w)}&range=${WEEK_LABEL_CELL}`;
-    const res = await fetch(url);
-    const text = await res.text();
-    const jsonStart = text.indexOf('{');
-    const jsonEnd = text.lastIndexOf('}');
-    const json = JSON.parse(text.substring(jsonStart, jsonEnd + 1));
-    const cell = json.table.rows && json.table.rows[0] && json.table.rows[0].c && json.table.rows[0].c[0];
-    const label = cell ? String(cell.v ?? '').trim() : '';
+    const vals = await fetchRangeValues(w.sheet, WEEK_LABEL_CELL, 'FORMATTED_VALUE');
+    const label = vals[0] && vals[0][0] ? String(vals[0][0]).trim() : '';
     if(label){
       document.getElementById('week-tag').textContent = label;
     }
@@ -348,6 +376,7 @@ async function fetchWeekLabel(w){
     // 실패해도 기존 라벨을 그대로 유지
   }
 }
+
 
 let tasks = [];
 let activeStatus = "전체";
@@ -393,12 +422,22 @@ function updateSheetLink(){
     : `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
 }
 
-// WEEKS_CONFIG을 다시 읽어 주차 목록을 갱신한다. (새로고침 시 코드에 방금 추가한 탭도 반영되도록)
+// 스프레드시트의 실제 탭 목록을 Sheets API로 다시 조회해서 드롭다운을 갱신한다.
 // 이미 보고 있던 주차가 있다면 목록이 바뀌어도 화면이 그 주차에 그대로 머무르게 한다.
-function refreshWeekList(){
+async function refreshWeekList(){
   const prevGid = WEEKS[CURRENT_WEEK_INDEX] ? WEEKS[CURRENT_WEEK_INDEX].gid : null;
 
-  WEEKS = buildWeeksFromConfig();
+  try{
+    const discovered = await discoverWeeks();
+    if(discovered.length > 0){
+      WEEKS = discovered;
+    }else if(WEEKS.length === 0){
+      WEEKS = FALLBACK_WEEKS.slice();
+    }
+  }catch(e){
+    console.error('탭 목록을 불러오지 못해 안전망 목록을 사용합니다:', e);
+    if(WEEKS.length === 0) WEEKS = FALLBACK_WEEKS.slice();
+  }
 
   let newIndex = 0;
   if(prevGid !== null){
@@ -419,9 +458,11 @@ function refreshWeekList(){
   updateSheetLink();
 }
 
-// 페이지 로드 시 주차 목록(WEEKS_CONFIG)을 드롭다운에 채운다.
-function initWeekSelect(){
-  refreshWeekList();
+// 페이지 로드 시 스프레드시트의 실제 탭 목록을 조회해 주차 드롭다운을 채운다.
+async function initWeekSelect(){
+  const sel = document.getElementById('week-select');
+  sel.innerHTML = `<option>탭 목록 확인 중...</option>`;
+  await refreshWeekList();
 }
 
 function onWeekChange(){
@@ -504,23 +545,34 @@ async function fetchMonthlyCompleted(baseTasks){
 }
 
 async function fetchTasksFromSheet(w){
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&${weekParam(w)}&range=${HEADER_RANGE}&headers=1`;
-  const res = await fetch(url);
-  if(!res.ok) throw new Error('스프레드시트 응답 오류 (' + res.status + ')');
-  const text = await res.text();
-  const jsonStart = text.indexOf('{');
-  const jsonEnd = text.lastIndexOf('}');
-  const json = JSON.parse(text.substring(jsonStart, jsonEnd + 1));
+  // 화면에 보이는 값(FORMATTED_VALUE)과 수식 원문(FORMULA)을 함께 받아서,
+  // =HYPERLINK("주소","라벨") 형태인 셀은 실제 링크로 살려서 보여준다.
+  const [formatted, formulas] = await Promise.all([
+    fetchRangeValues(w.sheet, HEADER_RANGE, 'FORMATTED_VALUE'),
+    fetchRangeValues(w.sheet, HEADER_RANGE, 'FORMULA'),
+  ]);
 
-  const rows = json.table.rows || [];
+  // HEADER_RANGE는 B7부터라 첫 행(index 0)이 헤더(7행), 그 다음부터가 실제 데이터(8행~)
+  const dataRows = formatted.slice(1);
+  const dataFormulaRows = formulas.slice(1);
   const result = [];
 
-  rows.forEach(r=>{
-    const c = r.c;
-    const get = (i)=>{
-      if(!c || !c[i]) return '';
-      const cell = c[i];
-      return (cell.f !== undefined && cell.f !== null && cell.f !== '') ? cell.f : (cell.v ?? '');
+  const hyperlinkRe = /^=HYPERLINK\(\s*"((?:[^"\\]|\\.)*)"\s*(?:,\s*"((?:[^"\\]|\\.)*)")?\s*\)\s*$/i;
+
+  dataRows.forEach((row, i)=>{
+    const rawRow = dataFormulaRows[i] || [];
+    const get = (idx)=>{
+      const raw = rawRow[idx];
+      if(typeof raw === 'string' && raw.trim().startsWith('=')){
+        const m = raw.trim().match(hyperlinkRe);
+        if(m){
+          const url = m[1];
+          const label = (m[2] !== undefined && m[2] !== '') ? m[2] : url;
+          return `{{LINK|${label}|${url}}}`; // linkify()에서 실제 <a> 태그로 변환됨
+        }
+      }
+      const v = row[idx];
+      return v !== undefined && v !== null ? v : '';
     };
     // 열 순서("업무 설명" 열 삭제 후 기준): 부서, 업무구분, 담당자, 업무명, 세부내용, 완료 업무, 상태, 마감일
     // ※ "세부내용" 열의 내용을 그대로 "이번주 업무" 박스에 반영합니다.
@@ -648,7 +700,7 @@ function highlight(text, term){
 function linkify(text){
   if(!text) return text;
   const urlRe = /(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+|\b(?:[a-zA-Z0-9-]+\.)+(?:com|net|org|co|io|me|kr|gle|ly|app|dev|link|site|new|page)(?:\.[a-zA-Z]{2,3})?\/[^\s<>"']*)/g;
-  return text.replace(urlRe, (match)=>{
+  let out = text.replace(urlRe, (match)=>{
     // 문장 끝에 자주 붙는 문장부호/괄호는 링크 밖으로 빼줌
     let trail = '';
     const m = match.match(/[.,)\]}!?;:'"]+$/);
@@ -660,6 +712,16 @@ function linkify(text){
     const href = /^https?:\/\//i.test(match) ? match : ('https://' + match);
     return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="cell-link" onclick="event.stopPropagation()">${match}</a>${trail}`;
   });
+
+  // =HYPERLINK("주소","라벨") 수식에서 뽑아낸 링크 마커를 실제 <a> 태그로 변환 (일반 URL 치환 뒤에 처리해서
+  // href 안의 주소가 다시 링크로 잡히는 걸 방지)
+  const linkSentinelRe = /\{\{LINK\|([^{}]*)\|([^{}]*)\}\}/g;
+  out = out.replace(linkSentinelRe, (_, label, url)=>{
+    const safeLabel = label || url;
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="cell-link" onclick="event.stopPropagation()">${safeLabel}</a>`;
+  });
+
+  return out;
 }
 
 function matchesSearch(t, term){
