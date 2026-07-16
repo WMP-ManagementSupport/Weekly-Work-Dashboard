@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
 <title>2026년 경영지원실 주간업무 대시보드</title>
 <style>
   :root{
@@ -215,10 +216,33 @@
     .task-top .status{grid-area:status;justify-self:center;}
     .task-top .due{grid-area:due;justify-self:end;}
   }
+  /* 비밀번호 게이트 */
+  .gate-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;}
+  .gate-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:36px 32px;width:100%;max-width:340px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.08);}
+  .gate-title{font-size:16px;font-weight:800;color:var(--ink);margin-bottom:6px;}
+  .gate-sub{font-size:12.5px;color:var(--sub);margin-bottom:20px;}
+  .gate-input{width:100%;box-sizing:border-box;font-size:14px;padding:11px 14px;border:1px solid var(--line);border-radius:10px;outline:none;text-align:center;letter-spacing:.05em;}
+  .gate-input:focus{border-color:var(--accent);}
+  .gate-btn{width:100%;margin-top:10px;font-size:13.5px;font-weight:700;color:#fff;background:var(--accent);border:none;border-radius:10px;padding:11px 14px;cursor:pointer;}
+  .gate-btn:hover{background:#2e4568;}
+  .gate-error{font-size:12px;color:#c0392b;margin-top:10px;min-height:16px;}
+  .gate-hidden{display:none !important;}
 </style>
 </head>
 <body>
-<div class="wrap">
+
+<!-- 비밀번호 게이트: 맞는 비밀번호를 입력해야 아래 대시보드가 나타남 -->
+<div class="gate-overlay" id="gate-overlay">
+  <div class="gate-card">
+    <div class="gate-title">🔒 경영지원실 주간업무 대시보드</div>
+    <div class="gate-sub">비밀번호를 입력해 주세요</div>
+    <input type="password" class="gate-input" id="gate-input" placeholder="비밀번호" autocomplete="off">
+    <button class="gate-btn" id="gate-btn" onclick="checkGatePassword()">입장하기</button>
+    <div class="gate-error" id="gate-error"></div>
+  </div>
+</div>
+
+<div class="wrap gate-hidden" id="app-wrap">
 
   <div class="now-bar" id="now-bar"></div>
 
@@ -282,6 +306,41 @@
 </div>
 
 <script>
+// ===== 비밀번호 게이트 =====
+// ⚠ 여기 비밀번호를 원하시는 값으로 바꿔서 쓰세요. 이 코드는 페이지 소스에 그대로 노출되므로
+// "완전한 보안"은 아니고, 검색엔진 노출이나 실수로 링크를 열어보는 것을 막는 용도입니다.
+const GATE_PASSWORD = 'wmp2026';
+const GATE_SESSION_KEY = 'dashboard_unlocked';
+
+function checkGatePassword(){
+  const input = document.getElementById('gate-input');
+  const errorEl = document.getElementById('gate-error');
+  if(input.value === GATE_PASSWORD){
+    sessionStorage.setItem(GATE_SESSION_KEY, '1');
+    unlockDashboard();
+  }else{
+    errorEl.textContent = '비밀번호가 올바르지 않습니다.';
+    input.value = '';
+    input.focus();
+  }
+}
+
+function unlockDashboard(){
+  document.getElementById('gate-overlay').classList.add('gate-hidden');
+  document.getElementById('app-wrap').classList.remove('gate-hidden');
+  startDashboard();
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  const input = document.getElementById('gate-input');
+  input.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') checkGatePassword(); });
+  input.focus();
+  // 같은 브라우저 세션(탭을 닫기 전까지) 안에서는 다시 입력하지 않아도 되도록 기억해둔다.
+  if(sessionStorage.getItem(GATE_SESSION_KEY) === '1'){
+    unlockDashboard();
+  }
+});
+
 // ===== 구글 스프레드시트 연동 설정 (Sheets API v4) =====
 const SHEET_ID = '1nLHE0Y6tJftFsJlU9czhd-VWG-HbXEk3ndZslar_jbQ';
 const API_KEY = 'AIzaSyBSuBKOLmMvr2hR6UIQKMFg6mJ6Seq0hz8'; // 읽기 전용, Sheets API로 제한된 키
@@ -1301,10 +1360,10 @@ document.getElementById('list').addEventListener('toggle', (e)=>{
   }
 }, true);
 
-(async function start(){
+async function startDashboard(){
   await initWeekSelect();
   await loadAndRender();
-})();
+}
 </script>
 </body>
 </html>
